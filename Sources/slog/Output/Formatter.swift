@@ -10,6 +10,7 @@ import Foundation
 /// Output format options
 public enum OutputFormat: String, CaseIterable, Sendable {
     case plain
+    case compact
     case color
     case json
 
@@ -17,6 +18,8 @@ public enum OutputFormat: String, CaseIterable, Sendable {
         switch self {
         case .plain:
             return "Plain text output"
+        case .compact:
+            return "Compact output (timestamp, level, message only)"
         case .color:
             return "Colored output based on log level"
         case .json:
@@ -37,6 +40,8 @@ public struct FormatterRegistry {
         switch format {
         case .plain:
             return PlainFormatter()
+        case .compact:
+            return PlainFormatter(showProcess: false, showSubsystem: false)
         case .color:
             return ColorFormatter()
         case .json:

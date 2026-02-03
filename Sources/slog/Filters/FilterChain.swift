@@ -8,75 +8,68 @@
 import Foundation
 
 /// A chain of filters that processes log entries
-public final class FilterChain: @unchecked Sendable {
+public struct FilterChain: Sendable {
     private var predicates: [any LogPredicate] = []
-    private let lock = NSLock()
 
     public init() {}
 
     /// Add a predicate to the filter chain
-    public func add(_ predicate: any LogPredicate) {
-        lock.lock()
-        defer { lock.unlock() }
+    public mutating func add(_ predicate: any LogPredicate) {
         predicates.append(predicate)
     }
 
     /// Add a process name filter
     @discardableResult
-    public func filterByProcess(_ name: String) -> FilterChain {
+    public mutating func filterByProcess(_ name: String) -> FilterChain {
         add(ProcessNamePredicate(processName: name))
         return self
     }
 
     /// Add a process ID filter
     @discardableResult
-    public func filterByPID(_ pid: Int) -> FilterChain {
+    public mutating func filterByPID(_ pid: Int) -> FilterChain {
         add(ProcessIDPredicate(pid: pid))
         return self
     }
 
     /// Add a subsystem filter
     @discardableResult
-    public func filterBySubsystem(_ subsystem: String, matchPrefix: Bool = false) -> FilterChain {
+    public mutating func filterBySubsystem(_ subsystem: String, matchPrefix: Bool = false) -> FilterChain {
         add(SubsystemPredicate(subsystem: subsystem, matchPrefix: matchPrefix))
         return self
     }
 
     /// Add a category filter
     @discardableResult
-    public func filterByCategory(_ category: String) -> FilterChain {
+    public mutating func filterByCategory(_ category: String) -> FilterChain {
         add(CategoryPredicate(category: category))
         return self
     }
 
     /// Add a minimum log level filter
     @discardableResult
-    public func filterByMinimumLevel(_ level: LogLevel) -> FilterChain {
+    public mutating func filterByMinimumLevel(_ level: LogLevel) -> FilterChain {
         add(MinimumLevelPredicate(minimumLevel: level))
         return self
     }
 
     /// Add a message substring filter
     @discardableResult
-    public func filterByMessageContaining(_ substring: String) -> FilterChain {
+    public mutating func filterByMessageContaining(_ substring: String) -> FilterChain {
         add(MessageContainsPredicate(substring: substring))
         return self
     }
 
     /// Add a regex filter on the message
     @discardableResult
-    public func filterByMessageRegex(_ pattern: String) -> FilterChain {
+    public mutating func filterByMessageRegex(_ pattern: String) -> FilterChain {
         add(MessageRegexPredicate(pattern: pattern))
         return self
     }
 
     /// Test if an entry passes all filters
     public func matches(_ entry: LogEntry) -> Bool {
-        lock.lock()
-        let currentPredicates = predicates
-        lock.unlock()
-
-        return currentPredicates.allSatisfy { $0.matches(entry) }
+        predicates.allSatisfy { $0.matches(entry) }
     }
 
     /// Filter a sequence of entries
@@ -85,24 +78,18 @@ public final class FilterChain: @unchecked Sendable {
     }
 
     /// Remove all predicates
-    public func clear() {
-        lock.lock()
-        defer { lock.unlock() }
+    public mutating func clear() {
         predicates.removeAll()
     }
 
     /// Check if the chain has any predicates
     public var isEmpty: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return predicates.isEmpty
+        predicates.isEmpty
     }
 
     /// Number of predicates in the chain
     public var count: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return predicates.count
+        predicates.count
     }
 }
 
@@ -143,7 +130,7 @@ public struct FilterChainBuilder {
     }
 
     public func build() -> FilterChain {
-        let chain = FilterChain()
+        var chain = FilterChain()
         for predicate in predicates {
             chain.add(predicate)
         }

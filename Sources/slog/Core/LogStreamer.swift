@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import Subprocess
+import System
 
 /// Configuration for log streaming
 public struct StreamConfiguration: Sendable {
@@ -42,111 +44,58 @@ public struct StreamConfiguration: Sendable {
     }
 }
 
-/// Manages spawning and reading from `log stream` process
-public final class LogStreamer: @unchecked Sendable {
-    private var process: Process?
-    private var outputPipe: Pipe?
-    private var errorPipe: Pipe?
+/// Manages spawning and reading from `log stream` process using swift-subprocess
+public struct LogStreamer: Sendable {
     private let parser: LogParser
-    private var isRunning = false
-    private let lock = NSLock()
-
-    /// Callback for each parsed log entry
-    public var onEntry: (@Sendable (LogEntry) -> Void)?
-
-    /// Callback for raw lines (useful for debugging)
-    public var onRawLine: (@Sendable (String) -> Void)?
-
-    /// Callback for errors
-    public var onError: (@Sendable (Error) -> Void)?
-
-    /// Callback when streaming stops
-    public var onStop: (@Sendable () -> Void)?
 
     public init() {
         self.parser = LogParser()
     }
 
-    /// Start streaming logs with the given configuration
-    public func start(configuration: StreamConfiguration) throws {
-        lock.lock()
-        defer { lock.unlock() }
+    /// Stream log entries asynchronously
+    /// - Parameter configuration: The stream configuration
+    /// - Returns: An async stream of log entries
+    public func stream(
+        configuration: StreamConfiguration
+    ) -> AsyncThrowingStream<LogEntry, Error> {
+        let parser = self.parser
+        let (executable, arguments) = buildCommand(for: configuration)
 
-        guard !isRunning else {
-            throw StreamerError.alreadyRunning
-        }
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let result = try await run(
+                        executable,
+                        arguments: Arguments(arguments)
+                    ) { execution, stdout in
+                        for try await line in stdout.lines() {
+                            if Task.isCancelled { break }
+                            if let entry = parser.parse(line: line) {
+                                continuation.yield(entry)
+                            }
+                        }
+                    }
 
-        let process = Process()
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
+                    // Check termination status
+                    if case .exited(let code) = result.terminationStatus, code != 0 {
+                        continuation.finish(throwing: StreamerError.logStreamError("Process exited with code \(code)"))
+                    } else {
+                        continuation.finish()
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
 
-        // Configure based on target
-        switch configuration.target {
-        case .local:
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
-            process.arguments = buildArguments(for: configuration)
-
-        case .simulator(let udid):
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-            process.arguments = ["simctl", "spawn", udid, "log"] + buildArguments(for: configuration)
-        }
-
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-
-        // Set up output handling
-        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
-
-            if let string = String(data: data, encoding: .utf8) {
-                self?.handleOutput(string)
+            continuation.onTermination = { _ in
+                task.cancel()
             }
         }
-
-        errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
-
-            if let string = String(data: data, encoding: .utf8) {
-                self?.handleError(string)
-            }
-        }
-
-        // Handle process termination
-        process.terminationHandler = { [weak self] _ in
-            self?.handleTermination()
-        }
-
-        try process.run()
-
-        self.process = process
-        self.outputPipe = outputPipe
-        self.errorPipe = errorPipe
-        self.isRunning = true
-    }
-
-    /// Stop the log stream
-    public func stop() {
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard isRunning else { return }
-
-        process?.terminate()
-        cleanup()
-    }
-
-    /// Check if currently streaming
-    public var running: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return isRunning
     }
 
     // MARK: - Private
 
-    private func buildArguments(for configuration: StreamConfiguration) -> [String] {
+    private func buildCommand(for configuration: StreamConfiguration) -> (Executable, [String]) {
         var args = ["stream", "--style", "ndjson"]
 
         if configuration.includeInfo {
@@ -162,45 +111,14 @@ public final class LogStreamer: @unchecked Sendable {
             args.append(predicate)
         }
 
-        return args
-    }
+        switch configuration.target {
+        case .local:
+            return (.path(FilePath("/usr/bin/log")), args)
 
-    private func handleOutput(_ string: String) {
-        // Split into lines and process each
-        let lines = string.split(separator: "\n", omittingEmptySubsequences: false)
-
-        for line in lines {
-            let lineString = String(line)
-            guard !lineString.isEmpty else { continue }
-
-            onRawLine?(lineString)
-
-            if let entry = parser.parse(line: lineString) {
-                onEntry?(entry)
-            }
+        case .simulator(let udid):
+            let simctlArgs = ["simctl", "spawn", udid, "log"] + args
+            return (.path(FilePath("/usr/bin/xcrun")), simctlArgs)
         }
-    }
-
-    private func handleError(_ string: String) {
-        let error = StreamerError.logStreamError(string.trimmingCharacters(in: .whitespacesAndNewlines))
-        onError?(error)
-    }
-
-    private func handleTermination() {
-        lock.lock()
-        cleanup()
-        lock.unlock()
-
-        onStop?()
-    }
-
-    private func cleanup() {
-        outputPipe?.fileHandleForReading.readabilityHandler = nil
-        errorPipe?.fileHandleForReading.readabilityHandler = nil
-        outputPipe = nil
-        errorPipe = nil
-        process = nil
-        isRunning = false
     }
 }
 

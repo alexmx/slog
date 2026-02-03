@@ -134,9 +134,9 @@ struct FilterChainTests {
 
     @Test("Filter chain combines predicates with AND logic")
     func chainCombinesWithAnd() {
-        let chain = FilterChain()
-            .filterByProcess("TestApp")
-            .filterByMinimumLevel(.error)
+        var chain = FilterChain()
+        chain.filterByProcess("TestApp")
+        chain.filterByMinimumLevel(.error)
 
         #expect(chain.matches(makeEntry(processName: "TestApp", level: .error)) == true)
         #expect(chain.matches(makeEntry(processName: "TestApp", level: .info)) == false)
@@ -168,7 +168,8 @@ struct FilterChainTests {
 
     @Test("Filter chain filters array of entries")
     func chainFiltersArray() {
-        let chain = FilterChain().filterByMinimumLevel(.error)
+        var chain = FilterChain()
+        chain.filterByMinimumLevel(.error)
 
         let entries = [
             makeEntry(level: .debug),

@@ -6,11 +6,10 @@
 //
 
 import ArgumentParser
-import Darwin
 import Foundation
 
 /// Command for streaming logs
-struct StreamCommand: ParsableCommand {
+struct StreamCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "stream",
         abstract: "Stream logs from macOS or iOS Simulator"
@@ -46,7 +45,7 @@ struct StreamCommand: ParsableCommand {
 
     // MARK: - Output Options
 
-    @Option(name: .long, help: "Output format (plain, color, json)")
+    @Option(name: .long, help: "Output format (plain, compact, color, json)")
     var format: String = "color"
 
     @Flag(name: .long, help: "Include info-level messages")
@@ -55,9 +54,36 @@ struct StreamCommand: ParsableCommand {
     @Flag(name: .long, help: "Include debug-level messages")
     var debug = false
 
+    // MARK: - Timing Options
+
+    @Option(name: .long, help: "Maximum wait time for first log entry (e.g., 5s, 1m)")
+    var timeout: String?
+
+    @Option(name: .long, help: "Capture duration after first log entry (e.g., 10s, 2m)")
+    var capture: String?
+
+    @Option(name: .long, help: "Number of entries to capture after first log entry")
+    var count: Int?
+
+    // MARK: - Validation
+
+    func validate() throws {
+        if let timeout = timeout {
+            _ = try parseDuration(timeout, optionName: "--timeout")
+        }
+
+        if let capture = capture {
+            _ = try parseDuration(capture, optionName: "--capture")
+        }
+
+        if let count = count, count <= 0 {
+            throw ValidationError("--count must be a positive integer")
+        }
+    }
+
     // MARK: - Run
 
-    func run() throws {
+    func run() async throws {
         // Determine output format
         let outputFormat = OutputFormat(rawValue: format) ?? .color
         let formatter = FormatterRegistry.formatter(for: outputFormat)
@@ -72,7 +98,7 @@ struct StreamCommand: ParsableCommand {
         )
 
         // Build client-side filter chain for regex
-        let filterChain = FilterChain()
+        var filterChain = FilterChain()
         if let grepPattern = grep {
             filterChain.filterByMessageRegex(grepPattern)
         }
@@ -86,40 +112,152 @@ struct StreamCommand: ParsableCommand {
             target = .local
         }
 
+        // Determine log level inclusion
+        // Auto-enable debug when filtering by subsystem (unless explicit level set)
+        let autoDebug = subsystem != nil && level == nil && !info && !debug
+        let includeDebugLogs = debug || autoDebug
+        let includeInfoLogs = info || includeDebugLogs
+
         // Create configuration
         let config = StreamConfiguration(
             target: target,
             predicate: predicate,
-            includeInfo: info || debug,
-            includeDebug: debug
+            includeInfo: includeInfoLogs,
+            includeDebug: includeDebugLogs
         )
+
+        // Parse timing options
+        let timeoutInterval = try timeout.map { try parseDuration($0, optionName: "--timeout") }
+        let captureInterval = try capture.map { try parseDuration($0, optionName: "--capture") }
+        let maxCount = count
 
         // Create streamer
         let streamer = LogStreamer()
+        let stream = streamer.stream(configuration: config)
 
-        // Set up signal handling for graceful shutdown
-        setupSignalHandler(streamer: streamer)
+        // Run with timing constraints
+        let exitCode = await runStream(
+            stream,
+            filterChain: filterChain,
+            formatter: formatter,
+            timeoutInterval: timeoutInterval,
+            captureInterval: captureInterval,
+            maxCount: maxCount
+        )
 
-        // Set up callbacks
-        streamer.onEntry = { entry in
-            // Apply client-side filters
-            if filterChain.isEmpty || filterChain.matches(entry) {
-                let output = formatter.format(entry)
-                print(output)
+        if exitCode != 0 {
+            throw ExitCode(Int32(exitCode))
+        }
+    }
+
+    // MARK: - Stream Processing
+
+    private func runStream(
+        _ stream: AsyncThrowingStream<LogEntry, Error>,
+        filterChain: FilterChain,
+        formatter: LogFormatter,
+        timeoutInterval: TimeInterval?,
+        captureInterval: TimeInterval?,
+        maxCount: Int?
+    ) async -> Int {
+        // Use actor for thread-safe state
+        let state = StreamState()
+
+        // Wrap stream iteration in a task so we can cancel it
+        let streamTask = Task {
+            do {
+                for try await entry in stream {
+                    // Check if we should stop
+                    if await state.shouldStop {
+                        break
+                    }
+
+                    // Apply client-side filters
+                    guard filterChain.isEmpty || filterChain.matches(entry) else {
+                        continue
+                    }
+
+                    // Handle first entry - notify state
+                    let isFirst = await state.recordEntry()
+                    if isFirst {
+                        // First entry received
+                    }
+
+                    // Output the entry
+                    let output = formatter.format(entry)
+                    print(output)
+
+                    // Check count limit
+                    if let maxCount = maxCount {
+                        let currentCount = await state.entryCount
+                        if currentCount >= maxCount {
+                            await state.stop(reason: .countReached)
+                            break
+                        }
+                    }
+                }
+            } catch is CancellationError {
+                // Task was cancelled
+            } catch {
+                await state.stop(reason: .error(error))
             }
         }
 
-        streamer.onError = { error in
-            FileHandle.standardError.write(
-                "Error: \(error.localizedDescription)\n".data(using: .utf8)!
-            )
+        // Set up timeout task if specified
+        let timeoutTask: Task<Void, Never>? = timeoutInterval.map { interval in
+            Task {
+                try? await Task.sleep(for: .seconds(interval))
+                // If we get here without cancellation, timeout occurred
+                let hasEntry = await state.hasReceivedEntry
+                if !hasEntry {
+                    await state.stop(reason: .timeout)
+                    streamTask.cancel()
+                }
+            }
         }
 
-        // Start streaming
-        try streamer.start(configuration: config)
+        // Set up capture duration monitoring
+        let captureTask: Task<Void, Never>? = captureInterval.map { interval in
+            Task {
+                // Wait for first entry
+                while true {
+                    let hasEntry = await state.hasReceivedEntry
+                    let stopped = await state.shouldStop
+                    if hasEntry || stopped { break }
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
 
-        // Keep running until interrupted
-        RunLoop.current.run()
+                // Cancel timeout since we got first entry
+                timeoutTask?.cancel()
+
+                // Now wait for capture duration
+                try? await Task.sleep(for: .seconds(interval))
+
+                // Capture period ended
+                if await !state.shouldStop {
+                    await state.stop(reason: .captureComplete)
+                    streamTask.cancel()
+                }
+            }
+        }
+
+        // Wait for stream task to complete
+        await streamTask.value
+
+        // Clean up
+        timeoutTask?.cancel()
+        captureTask?.cancel()
+
+        // Determine exit code
+        let reason = await state.stopReason
+        switch reason {
+        case .timeout:
+            return 1
+        case .error:
+            return 1
+        default:
+            return 0
+        }
     }
 
     // MARK: - Helpers
@@ -159,14 +297,71 @@ struct StreamCommand: ParsableCommand {
 
         throw StreamerError.simulatorNotFound("No booted simulator found. Boot a simulator or specify --simulator-udid")
     }
+}
 
-    private func setupSignalHandler(streamer: LogStreamer) {
-        signal(SIGINT) { _ in
-            Darwin.exit(0)
-        }
+// MARK: - Stream State
 
-        signal(SIGTERM) { _ in
-            Darwin.exit(0)
-        }
+private actor StreamState {
+    enum StopReason {
+        case none
+        case timeout
+        case captureComplete
+        case countReached
+        case interrupted
+        case error(Error)
     }
+
+    private(set) var entryCount = 0
+    private(set) var hasReceivedEntry = false
+    private(set) var shouldStop = false
+    private(set) var stopReason: StopReason = .none
+
+    /// Record an entry and return true if this is the first entry
+    func recordEntry() -> Bool {
+        entryCount += 1
+        let isFirst = !hasReceivedEntry
+        hasReceivedEntry = true
+        return isFirst
+    }
+
+    func stop(reason: StopReason) {
+        guard !shouldStop else { return }
+        shouldStop = true
+        stopReason = reason
+    }
+}
+
+// MARK: - Duration Parsing
+
+/// Parse a duration string like "5s", "2m", "1h" into seconds
+func parseDuration(_ string: String, optionName: String) throws -> TimeInterval {
+    let trimmed = string.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty else {
+        throw ValidationError("\(optionName) cannot be empty")
+    }
+
+    let lastChar = trimmed.last!
+    let multiplier: Double
+    let numberString: String
+
+    switch lastChar {
+    case "s", "S":
+        multiplier = 1.0
+        numberString = String(trimmed.dropLast())
+    case "m", "M":
+        multiplier = 60.0
+        numberString = String(trimmed.dropLast())
+    case "h", "H":
+        multiplier = 3600.0
+        numberString = String(trimmed.dropLast())
+    default:
+        multiplier = 1.0
+        numberString = trimmed
+    }
+
+    guard let value = Double(numberString), value > 0 else {
+        throw ValidationError("\(optionName) must be a positive number with optional suffix (s, m, h). Got: \(string)")
+    }
+
+    return value * multiplier
 }
