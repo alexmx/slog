@@ -99,8 +99,8 @@ Sources/slog/
 **Key patterns:**
 - Protocol-based extensibility (LogFormatter, LogPredicate)
 - Builder pattern for predicates and filter chains
-- Thread-safe components using NSLock
-- Sendable types for Swift concurrency
+- Modern Swift Concurrency (async/await, actors, Sendable types)
+- swift-subprocess for async process execution
 
 ## Log Levels
 
@@ -129,4 +129,9 @@ swift test --filter <name>    # Run specific test
 ## Dependencies
 
 - `swift-argument-parser` - CLI parsing and command structure
+- `swift-subprocess` - Modern async process execution
 - `Rainbow` - ANSI color support for terminal output
+
+## Git Commits
+
+**Never add `Co-Authored-By` attribution to commits.** Write commit messages without any co-author trailers.
