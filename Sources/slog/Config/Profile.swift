@@ -41,6 +41,9 @@ public struct Profile: Codable, Equatable, Sendable {
     /// Include source location info
     public var source: Bool?
 
+    /// Collapse consecutive identical messages
+    public var dedup: Bool?
+
     /// Stream from iOS Simulator
     public var simulator: Bool?
 
@@ -59,6 +62,7 @@ public struct Profile: Codable, Equatable, Sendable {
         info: Bool? = nil,
         debug: Bool? = nil,
         source: Bool? = nil,
+        dedup: Bool? = nil,
         simulator: Bool? = nil,
         simulatorUDID: String? = nil
     ) {
@@ -73,6 +77,7 @@ public struct Profile: Codable, Equatable, Sendable {
         self.info = info
         self.debug = debug
         self.source = source
+        self.dedup = dedup
         self.simulator = simulator
         self.simulatorUDID = simulatorUDID
     }
@@ -81,7 +86,7 @@ public struct Profile: Codable, Equatable, Sendable {
     public var isEmpty: Bool {
         process == nil && pid == nil && subsystem == nil && category == nil &&
         level == nil && grep == nil && format == nil && time == nil && info == nil &&
-        debug == nil && source == nil && simulator == nil && simulatorUDID == nil
+        debug == nil && source == nil && dedup == nil && simulator == nil && simulatorUDID == nil
     }
 
     /// Resolve the level string to a LogLevel, if valid

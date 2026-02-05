@@ -65,6 +65,9 @@ struct StreamCommand: AsyncParsableCommand {
     @Flag(name: .long, inversion: .prefixedNo, help: "Include source location info")
     var source: Bool?
 
+    @Flag(name: .long, inversion: .prefixedNo, help: "Collapse consecutive identical messages")
+    var dedup: Bool?
+
     // MARK: - Timing Options
 
     @Option(name: .long, help: "Maximum wait time for first log entry (e.g., 5s, 1m)")
@@ -112,6 +115,7 @@ struct StreamCommand: AsyncParsableCommand {
         let effectiveSimulator = simulator || (prof?.simulator ?? false)
         let effectiveSimulatorUDID = simulatorUDID ?? prof?.simulatorUDID
         let effectiveTime = time ?? prof?.resolvedTimeMode ?? .absolute
+        let effectiveDedup = dedup ?? prof?.dedup ?? false
 
         // Determine output format
         let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep, timeMode: effectiveTime)
@@ -160,6 +164,9 @@ struct StreamCommand: AsyncParsableCommand {
         let captureInterval = try capture.map { try DurationParser.parse($0, optionName: "--capture") }
         let maxCount = count
 
+        // Create dedup writer if enabled
+        let dedupWriter = effectiveDedup ? DedupWriter(formatter: formatter) : nil
+
         // Create streamer
         let streamer = LogStreamer()
         let stream = streamer.stream(configuration: config)
@@ -169,6 +176,7 @@ struct StreamCommand: AsyncParsableCommand {
             stream,
             filterChain: filterChain,
             formatter: formatter,
+            dedupWriter: dedupWriter,
             timeoutInterval: timeoutInterval,
             captureInterval: captureInterval,
             maxCount: maxCount
@@ -185,6 +193,7 @@ struct StreamCommand: AsyncParsableCommand {
         _ stream: AsyncThrowingStream<LogEntry, Error>,
         filterChain: FilterChain,
         formatter: LogFormatter,
+        dedupWriter: DedupWriter?,
         timeoutInterval: TimeInterval?,
         captureInterval: TimeInterval?,
         maxCount: Int?
@@ -213,8 +222,12 @@ struct StreamCommand: AsyncParsableCommand {
                     }
 
                     // Output the entry
-                    let output = formatter.format(entry)
-                    print(output)
+                    if let dedupWriter = dedupWriter {
+                        dedupWriter.write(entry)
+                    } else {
+                        let output = formatter.format(entry)
+                        print(output)
+                    }
 
                     // Check count limit
                     if let maxCount = maxCount {
@@ -272,6 +285,9 @@ struct StreamCommand: AsyncParsableCommand {
 
         // Wait for stream task to complete
         await streamTask.value
+
+        // Flush any buffered dedup output
+        dedupWriter?.flush()
 
         // Clean up
         timeoutTask?.cancel()

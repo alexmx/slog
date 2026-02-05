@@ -55,6 +55,9 @@ struct ShowCommand: AsyncParsableCommand {
     @Flag(name: .long, inversion: .prefixedNo, help: "Include source location info")
     var source: Bool?
 
+    @Flag(name: .long, inversion: .prefixedNo, help: "Collapse consecutive identical messages")
+    var dedup: Bool?
+
     // MARK: - Time Range Options
 
     @Option(name: .long, help: "Show logs from last duration or boot (e.g., 5m, 1h, boot)")
@@ -116,8 +119,10 @@ struct ShowCommand: AsyncParsableCommand {
         let effectiveDebug = debug ?? prof?.debug ?? false
         let effectiveSource = source ?? prof?.source ?? false
         let effectiveTime = time ?? prof?.resolvedTimeMode ?? .absolute
+        let effectiveDedup = dedup ?? prof?.dedup ?? false
 
         let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep, timeMode: effectiveTime)
+        let dedupWriter = effectiveDedup ? DedupWriter(formatter: formatter) : nil
 
         // Build server-side predicate
         let predicate = PredicateBuilder.buildPredicate(
@@ -179,8 +184,12 @@ struct ShowCommand: AsyncParsableCommand {
                     continue
                 }
 
-                let output = formatter.format(entry)
-                print(output)
+                if let dedupWriter = dedupWriter {
+                    dedupWriter.write(entry)
+                } else {
+                    let output = formatter.format(entry)
+                    print(output)
+                }
 
                 entryCount += 1
                 if let maxCount = count, entryCount >= maxCount {
@@ -190,5 +199,8 @@ struct ShowCommand: AsyncParsableCommand {
         } catch is CancellationError {
             // Cancelled
         }
+
+        // Flush any buffered dedup output
+        dedupWriter?.flush()
     }
 }

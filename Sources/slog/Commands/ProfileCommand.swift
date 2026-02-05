@@ -120,6 +120,9 @@ struct CreateProfile: ParsableCommand {
     @Flag(name: .long, help: "Include source location info")
     var source = false
 
+    @Flag(name: .long, help: "Collapse consecutive identical messages")
+    var dedup = false
+
     // MARK: - Stream Options
 
     @Flag(name: .long, help: "Stream from iOS Simulator")
@@ -141,6 +144,7 @@ struct CreateProfile: ParsableCommand {
             info: info ? true : nil,
             debug: debug ? true : nil,
             source: source ? true : nil,
+            dedup: dedup ? true : nil,
             simulator: simulator ? true : nil,
             simulatorUDID: simulatorUDID
         )
