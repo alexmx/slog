@@ -5,16 +5,16 @@
 //  Created by Alex Maimescu on 02/02/2026.
 //
 
-import Testing
 import Foundation
 @testable import slog
+import Testing
 
 @Suite("LogParser Tests")
 struct LogParserTests {
     let parser = LogParser()
 
     @Test("Parse valid NDJSON log entry")
-    func parseValidNDJSON() throws {
+    func parseValidNDJSON() {
         let json = """
         {"timestamp":"2024-01-15T10:30:45.123456Z","processImagePath":"/Applications/Finder.app/Contents/MacOS/Finder","processID":1234,"senderImagePath":"/usr/lib/libnetwork.dylib","subsystem":"com.apple.finder","category":"default","messageType":"Info","eventType":"logEvent","eventMessage":"Test message","source":{"symbol":"-[MyClass doThing]","file":"MyFile.swift","line":42,"image":"MyFramework"}}
         """
@@ -35,7 +35,7 @@ struct LogParserTests {
     }
 
     @Test("Parse log entry with missing optional fields")
-    func parseMissingOptionalFields() throws {
+    func parseMissingOptionalFields() {
         let json = """
         {"timestamp":"2024-01-15T10:30:45Z","processImagePath":"/usr/bin/test","processID":999,"messageType":"Error","eventMessage":"Error occurred"}
         """

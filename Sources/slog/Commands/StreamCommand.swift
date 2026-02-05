@@ -82,15 +82,15 @@ struct StreamCommand: AsyncParsableCommand {
     // MARK: - Validation
 
     func validate() throws {
-        if let timeout = timeout {
+        if let timeout {
             _ = try DurationParser.parse(timeout, optionName: "--timeout")
         }
 
-        if let capture = capture {
+        if let capture {
             _ = try DurationParser.parse(capture, optionName: "--capture")
         }
 
-        if let count = count, count <= 0 {
+        if let count, count <= 0 {
             throw ValidationError("--count must be a positive integer")
         }
     }
@@ -222,7 +222,7 @@ struct StreamCommand: AsyncParsableCommand {
                     }
 
                     // Output the entry
-                    if let dedupWriter = dedupWriter {
+                    if let dedupWriter {
                         dedupWriter.write(entry)
                     } else {
                         let output = formatter.format(entry)
@@ -230,7 +230,7 @@ struct StreamCommand: AsyncParsableCommand {
                     }
 
                     // Check count limit
-                    if let maxCount = maxCount {
+                    if let maxCount {
                         let currentCount = await state.entryCount
                         if currentCount >= maxCount {
                             await state.stop(reason: .countReached)
@@ -308,7 +308,7 @@ struct StreamCommand: AsyncParsableCommand {
     // MARK: - Helpers
 
     private func resolveSimulatorUDID(_ udid: String? = nil) throws -> String {
-        if let udid = udid {
+        if let udid {
             return udid
         }
 
@@ -326,7 +326,8 @@ struct StreamCommand: AsyncParsableCommand {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let devices = json["devices"] as? [String: [[String: Any]]] else {
+              let devices = json["devices"] as? [String: [[String: Any]]]
+        else {
             throw StreamError.simulatorNotFound("Could not parse simulator list")
         }
 
@@ -334,7 +335,8 @@ struct StreamCommand: AsyncParsableCommand {
         for (_, deviceList) in devices {
             for device in deviceList {
                 if let state = device["state"] as? String, state == "Booted",
-                   let udid = device["udid"] as? String {
+                   let udid = device["udid"] as? String
+                {
                     return udid
                 }
             }
@@ -374,4 +376,3 @@ private actor StreamState {
         stopReason = reason
     }
 }
-

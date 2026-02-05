@@ -3,13 +3,12 @@
 //  slog
 //
 
-import Testing
 import Foundation
 @testable import slog
+import Testing
 
 @Suite("ShowConfiguration Tests")
 struct ShowConfigurationTests {
-
     @Test("Default configuration has expected values")
     func defaultConfiguration() {
         let config = ShowConfiguration()

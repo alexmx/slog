@@ -27,7 +27,7 @@ enum ProfileManager {
     static func save(_ name: String, profile: Profile, force: Bool = false) throws {
         let url = profileURL(name)
 
-        if !force && FileManager.default.fileExists(atPath: url.path) {
+        if !force, FileManager.default.fileExists(atPath: url.path) {
             throw ProfileError.alreadyExists(name)
         }
 
@@ -91,11 +91,11 @@ public enum ProfileError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .notFound(let name):
-            return "Profile not found: \(name)"
+            "Profile not found: \(name)"
         case .invalidProfile(let message):
-            return "Invalid profile: \(message)"
+            "Invalid profile: \(message)"
         case .alreadyExists(let name):
-            return "Profile already exists: \(name). Use --force to overwrite."
+            "Profile already exists: \(name). Use --force to overwrite."
         }
     }
 }

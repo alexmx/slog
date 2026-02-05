@@ -87,7 +87,8 @@ public struct LogParser: Sendable {
                   in: line,
                   range: NSRange(line.startIndex..., in: line)
               ),
-              let timestampRange = Range(timestampMatch.range(at: 1), in: line) else {
+              let timestampRange = Range(timestampMatch.range(at: 1), in: line)
+        else {
             return nil
         }
 
@@ -110,7 +111,8 @@ public struct LogParser: Sendable {
               ),
               let nameRange = Range(processMatch.range(at: 1), in: remainder),
               let pidRange = Range(processMatch.range(at: 2), in: remainder),
-              let pid = Int(remainder[pidRange]) else {
+              let pid = Int(remainder[pidRange])
+        else {
             // If we can't parse process info, create a basic entry
             return LogEntry(
                 timestamp: timestamp,
@@ -141,7 +143,8 @@ public struct LogParser: Sendable {
                in: messageRemainder,
                range: NSRange(messageRemainder.startIndex..., in: messageRemainder)
            ),
-           let subsystemRange = Range(subsystemMatch.range(at: 1), in: messageRemainder) {
+           let subsystemRange = Range(subsystemMatch.range(at: 1), in: messageRemainder)
+        {
             subsystem = String(messageRemainder[subsystemRange])
             if let fullRange = Range(subsystemMatch.range, in: messageRemainder) {
                 messageRemainder = String(messageRemainder[fullRange.upperBound...])
@@ -157,7 +160,8 @@ public struct LogParser: Sendable {
                in: messageRemainder,
                range: NSRange(messageRemainder.startIndex..., in: messageRemainder)
            ),
-           let levelRange = Range(levelMatch.range(at: 1), in: messageRemainder) {
+           let levelRange = Range(levelMatch.range(at: 1), in: messageRemainder)
+        {
             let levelString = String(messageRemainder[levelRange])
             level = LogLevel(string: levelString) ?? .default
             if let fullRange = Range(levelMatch.range, in: messageRemainder) {
@@ -214,16 +218,16 @@ private struct RawLogEntry: Decodable {
         func formatted() -> String? {
             var parts: [String] = []
 
-            if let image = image, !image.isEmpty {
+            if let image, !image.isEmpty {
                 parts.append(image)
             }
 
-            if let symbol = symbol, !symbol.isEmpty {
+            if let symbol, !symbol.isEmpty {
                 parts.append(symbol)
             }
 
-            if let file = file, !file.isEmpty {
-                if let line = line, line > 0 {
+            if let file, !file.isEmpty {
+                if let line, line > 0 {
                     parts.append("\(file):\(line)")
                 } else {
                     parts.append(file)
@@ -245,22 +249,20 @@ private struct RawLogEntry: Decodable {
 
     func toLogEntry() -> LogEntry {
         // Parse timestamp
-        let timestamp = parseTimestamp(self.timestamp)
+        let timestamp = parseTimestamp(timestamp)
 
         // Extract process name from path
-        let processName: String
-        if let path = processImagePath {
-            processName = URL(fileURLWithPath: path).lastPathComponent
+        let processName: String = if let path = processImagePath {
+            URL(fileURLWithPath: path).lastPathComponent
         } else {
-            processName = "unknown"
+            "unknown"
         }
 
         // Parse log level from messageType
-        let level: LogLevel
-        if let messageType = messageType {
-            level = LogLevel(string: messageType) ?? .default
+        let level: LogLevel = if let messageType {
+            LogLevel(string: messageType) ?? .default
         } else {
-            level = .default
+            .default
         }
 
         return LogEntry(

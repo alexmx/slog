@@ -52,11 +52,10 @@ public struct ColorFormatter: LogFormatter {
         }
 
         if showSubsystem, let subsystem = entry.subsystem {
-            let subsystemStr: String
-            if let category = entry.category {
-                subsystemStr = "(\(subsystem):\(category))"
+            let subsystemStr = if let category = entry.category {
+                "(\(subsystem):\(category))"
             } else {
-                subsystemStr = "(\(subsystem))"
+                "(\(subsystem))"
             }
             components.append(subsystemStr.lightBlack)
         }
@@ -65,7 +64,8 @@ public struct ColorFormatter: LogFormatter {
 
         // Highlight pattern matches if specified
         if let pattern = highlightPattern,
-           let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+           let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+        {
             message = highlightMatches(in: message, regex: regex)
         }
 
@@ -104,15 +104,15 @@ public struct ColorFormatter: LogFormatter {
     private func colorMessage(_ message: String, level: LogLevel) -> String {
         switch level {
         case .debug:
-            return message.lightBlack
+            message.lightBlack
         case .info:
-            return message
+            message
         case .default:
-            return message
+            message
         case .error:
-            return message.red
+            message.red
         case .fault:
-            return message.red.bold
+            message.red.bold
         }
     }
 

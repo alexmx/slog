@@ -8,7 +8,6 @@ import ToonFormat
 
 /// TOON output formatter for log entries
 public struct ToonFormatter: LogFormatter {
-
     public init() {}
 
     public func format(_ entry: LogEntry) -> String {

@@ -3,9 +3,9 @@
 //  slog
 //
 
-import Testing
 import Foundation
 @testable import slog
+import Testing
 
 /// Test formatter that returns just the message
 private struct MessageOnlyFormatter: LogFormatter {
@@ -16,7 +16,6 @@ private struct MessageOnlyFormatter: LogFormatter {
 
 @Suite("DedupWriter Tests")
 struct DedupWriterTests {
-
     private func makeEntry(message: String) -> LogEntry {
         LogEntry(
             timestamp: Date(),

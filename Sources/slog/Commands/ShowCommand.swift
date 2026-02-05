@@ -82,21 +82,21 @@ struct ShowCommand: AsyncParsableCommand {
     // MARK: - Validation
 
     func validate() throws {
-        if last == nil && start == nil && archivePath == nil {
+        if last == nil, start == nil, archivePath == nil {
             throw ValidationError(
                 "Specify a time range with --last or --start, or provide a .logarchive path"
             )
         }
 
-        if last != nil && (start != nil || end != nil) {
+        if last != nil, start != nil || end != nil {
             throw ValidationError("--last cannot be combined with --start or --end")
         }
 
-        if end != nil && start == nil && archivePath == nil {
+        if end != nil, start == nil, archivePath == nil {
             throw ValidationError("--end requires --start or a .logarchive path")
         }
 
-        if let count = count, count <= 0 {
+        if let count, count <= 0 {
             throw ValidationError("--count must be a positive integer")
         }
     }
@@ -140,21 +140,20 @@ struct ShowCommand: AsyncParsableCommand {
         }
 
         // Determine time range
-        let timeRange: ShowConfiguration.TimeRange?
-        if let last = last {
+        let timeRange: ShowConfiguration.TimeRange? = if let last {
             if last.lowercased() == "boot" {
-                timeRange = .lastBoot
+                .lastBoot
             } else {
-                timeRange = .last(last)
+                .last(last)
             }
-        } else if let start = start {
-            if let end = end {
-                timeRange = .range(start: start, end: end)
+        } else if let start {
+            if let end {
+                .range(start: start, end: end)
             } else {
-                timeRange = .start(start)
+                .start(start)
             }
         } else {
-            timeRange = nil
+            nil
         }
 
         // Determine log level inclusion
@@ -184,7 +183,7 @@ struct ShowCommand: AsyncParsableCommand {
                     continue
                 }
 
-                if let dedupWriter = dedupWriter {
+                if let dedupWriter {
                     dedupWriter.write(entry)
                 } else {
                     let output = formatter.format(entry)

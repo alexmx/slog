@@ -5,13 +5,13 @@
 //  Created by Alex Maimescu on 02/02/2026.
 //
 
-import Testing
 import Foundation
 @testable import slog
+import Testing
 
 @Suite("Filter Predicate Tests")
 struct FilterPredicateTests {
-    // Helper to create a test log entry
+    /// Helper to create a test log entry
     func makeEntry(
         processName: String = "TestApp",
         pid: Int = 1234,

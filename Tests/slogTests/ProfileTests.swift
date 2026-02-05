@@ -3,13 +3,12 @@
 //  slog
 //
 
-import Testing
 import Foundation
 @testable import slog
+import Testing
 
 @Suite("XDGDirectories Tests")
 struct XDGDirectoriesTests {
-
     @Test("Falls back to ~/.config when XDG_CONFIG_HOME is unset")
     func fallbackToDefault() {
         // When XDG_CONFIG_HOME is not set to an absolute path, should use ~/.config
@@ -33,7 +32,6 @@ struct XDGDirectoriesTests {
 
 @Suite("Profile Tests")
 struct ProfileTests {
-
     @Test("Profile encode/decode round-trip")
     func roundTrip() throws {
         let profile = Profile(
@@ -58,7 +56,7 @@ struct ProfileTests {
         let json = """
         {"process": "Finder", "level": "error"}
         """
-        let data = json.data(using: .utf8)!
+        let data = try #require(json.data(using: .utf8))
         let profile = try JSONDecoder().decode(Profile.self, from: data)
 
         #expect(profile.process == "Finder")
@@ -123,7 +121,7 @@ struct ProfileTests {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(profile)
-        let json = String(data: data, encoding: .utf8)!
+        let json = try #require(String(data: data, encoding: .utf8))
 
         #expect(json.contains("\"process\""))
         #expect(!json.contains("\"subsystem\""))

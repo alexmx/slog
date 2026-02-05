@@ -3,15 +3,14 @@
 //  slog
 //
 
-import Testing
 import Foundation
 @testable import slog
+import Testing
 
 @Suite("TimestampFormatter Tests")
 struct TimestampFormatterTests {
-
     @Test("Absolute mode formats as HH:mm:ss.SSS")
-    func absoluteMode() {
+    func absoluteMode() throws {
         let formatter = TimestampFormatter(mode: .absolute)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
@@ -19,7 +18,7 @@ struct TimestampFormatterTests {
             year: 2026, month: 2, day: 5,
             hour: 14, minute: 30, second: 45, nanosecond: 123_000_000
         )
-        let date = calendar.date(from: components)!
+        let date = try #require(calendar.date(from: components))
 
         let result = formatter.format(date)
         #expect(result == "14:30:45.123")

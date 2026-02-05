@@ -22,8 +22,8 @@ public final class TimestampFormatter: @unchecked Sendable {
 
     public init(mode: TimeMode = .absolute) {
         self.mode = mode
-        self.dateFormatter = DateFormatter()
-        self.dateFormatter.dateFormat = "HH:mm:ss.SSS"
+        dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "HH:mm:ss.SSS"
     }
 
     public func format(_ timestamp: Date) -> String {
@@ -68,15 +68,15 @@ public enum OutputFormat: String, CaseIterable, Sendable, CustomStringConvertibl
     public var description: String {
         switch self {
         case .plain:
-            return "Plain text output"
+            "Plain text output"
         case .compact:
-            return "Compact output (timestamp, level, message only)"
+            "Compact output (timestamp, level, message only)"
         case .color:
-            return "Colored output based on log level"
+            "Colored output based on log level"
         case .json:
-            return "JSON output for piping to other tools"
+            "JSON output for piping to other tools"
         case .toon:
-            return "TOON output (token-optimized for LLMs)"
+            "TOON output (token-optimized for LLMs)"
         }
     }
 }

@@ -27,9 +27,9 @@ public struct ProcessNamePredicate: LogPredicate {
 
     public func matches(_ entry: LogEntry) -> Bool {
         if caseSensitive {
-            return entry.processName == processName
+            entry.processName == processName
         } else {
-            return entry.processName.lowercased() == processName.lowercased()
+            entry.processName.lowercased() == processName.lowercased()
         }
     }
 }
@@ -125,9 +125,9 @@ public struct MessageContainsPredicate: LogPredicate {
 
     public func matches(_ entry: LogEntry) -> Bool {
         if caseSensitive {
-            return entry.message.contains(substring)
+            entry.message.contains(substring)
         } else {
-            return entry.message.lowercased().contains(substring.lowercased())
+            entry.message.lowercased().contains(substring.lowercased())
         }
     }
 }
@@ -143,11 +143,11 @@ public struct MessageRegexPredicate: LogPredicate {
         if !caseSensitive {
             options.insert(.caseInsensitive)
         }
-        self.regex = try? NSRegularExpression(pattern: pattern, options: options)
+        regex = try? NSRegularExpression(pattern: pattern, options: options)
     }
 
     public func matches(_ entry: LogEntry) -> Bool {
-        guard let regex = regex else { return false }
+        guard let regex else { return false }
 
         let range = NSRange(entry.message.startIndex..., in: entry.message)
         return regex.firstMatch(in: entry.message, options: [], range: range) != nil
@@ -201,7 +201,7 @@ public struct NotPredicate: LogPredicate {
 public struct AlwaysPredicate: LogPredicate {
     public init() {}
 
-    public func matches(_ entry: LogEntry) -> Bool {
+    public func matches(_: LogEntry) -> Bool {
         true
     }
 }
@@ -210,7 +210,7 @@ public struct AlwaysPredicate: LogPredicate {
 public struct NeverPredicate: LogPredicate {
     public init() {}
 
-    public func matches(_ entry: LogEntry) -> Bool {
+    public func matches(_: LogEntry) -> Bool {
         false
     }
 }

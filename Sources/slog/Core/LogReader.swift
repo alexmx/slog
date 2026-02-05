@@ -68,7 +68,7 @@ public struct LogReader: Sendable {
     public func read(
         configuration: ShowConfiguration
     ) -> AsyncThrowingStream<LogEntry, Error> {
-        let parser = self.parser
+        let parser = parser
         let arguments = buildArguments(for: configuration)
 
         return AsyncThrowingStream { continuation in
@@ -77,7 +77,7 @@ public struct LogReader: Sendable {
                     let result = try await run(
                         .path(FilePath("/usr/bin/log")),
                         arguments: Arguments(arguments)
-                    ) { execution, stdout in
+                    ) { _, stdout in
                         for try await line in stdout.lines() {
                             if Task.isCancelled { break }
                             if let entry = parser.parse(line: line) {
@@ -162,9 +162,9 @@ public enum ShowError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .logShowError(let message):
-            return "Log show error: \(message)"
+            "Log show error: \(message)"
         case .invalidTimeRange(let message):
-            return "Invalid time range: \(message)"
+            "Invalid time range: \(message)"
         }
     }
 }

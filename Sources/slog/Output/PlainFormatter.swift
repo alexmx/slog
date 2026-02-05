@@ -61,15 +61,15 @@ public struct PlainFormatter: LogFormatter {
     private func levelString(_ level: LogLevel) -> String {
         switch level {
         case .debug:
-            return "DEBUG"
+            "DEBUG"
         case .info:
-            return "INFO"
+            "INFO"
         case .default:
-            return "DEFAULT"
+            "DEFAULT"
         case .error:
-            return "ERROR"
+            "ERROR"
         case .fault:
-            return "FAULT"
+            "FAULT"
         }
     }
 }

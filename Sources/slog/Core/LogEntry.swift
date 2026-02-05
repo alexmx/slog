@@ -19,7 +19,8 @@ public enum LogLevel: String, Codable, CaseIterable, Comparable, Sendable {
     public static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
         let order: [LogLevel] = [.debug, .info, .default, .error, .fault]
         guard let lhsIndex = order.firstIndex(of: lhs),
-              let rhsIndex = order.firstIndex(of: rhs) else {
+              let rhsIndex = order.firstIndex(of: rhs)
+        else {
             return false
         }
         return lhsIndex < rhsIndex
@@ -140,15 +141,15 @@ extension LogEntry: CustomStringConvertible {
 
         var components = [timeString, "[\(level.rawValue)]", processName, "(\(pid))"]
 
-        if let subsystem = subsystem {
+        if let subsystem {
             components.append("[\(subsystem)]")
         }
 
-        if let category = category {
+        if let category {
             components.append("[\(category)]")
         }
 
-        if let senderImagePath = senderImagePath {
+        if let senderImagePath {
             let senderName = URL(fileURLWithPath: senderImagePath).lastPathComponent
             components.append("<\(senderName)>")
         }

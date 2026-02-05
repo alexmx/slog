@@ -85,8 +85,8 @@ public struct Profile: Codable, Equatable, Sendable {
     /// Whether the profile has no fields set
     public var isEmpty: Bool {
         process == nil && pid == nil && subsystem == nil && category == nil &&
-        level == nil && grep == nil && format == nil && time == nil && info == nil &&
-        debug == nil && source == nil && dedup == nil && simulator == nil && simulatorUDID == nil
+            level == nil && grep == nil && format == nil && time == nil && info == nil &&
+            debug == nil && source == nil && dedup == nil && simulator == nil && simulatorUDID == nil
     }
 
     /// Resolve the level string to a LogLevel, if valid

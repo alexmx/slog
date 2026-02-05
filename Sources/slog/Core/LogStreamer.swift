@@ -63,7 +63,7 @@ public struct LogStreamer: Sendable {
     public func stream(
         configuration: StreamConfiguration
     ) -> AsyncThrowingStream<LogEntry, Error> {
-        let parser = self.parser
+        let parser = parser
         let (executable, arguments) = buildCommand(for: configuration)
 
         return AsyncThrowingStream { continuation in
@@ -72,7 +72,7 @@ public struct LogStreamer: Sendable {
                     let result = try await run(
                         executable,
                         arguments: Arguments(arguments)
-                    ) { execution, stdout in
+                    ) { _, stdout in
                         for try await line in stdout.lines() {
                             if Task.isCancelled { break }
                             if let entry = parser.parse(line: line) {
@@ -140,9 +140,9 @@ public enum StreamError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .logStreamError(let message):
-            return "Log stream error: \(message)"
+            "Log stream error: \(message)"
         case .simulatorNotFound(let udid):
-            return "Simulator not found: \(udid)"
+            "Simulator not found: \(udid)"
         }
     }
 }
@@ -177,18 +177,17 @@ public struct PredicateBuilder: Sendable {
 
     /// Filter by minimum log level
     public mutating func level(_ level: LogLevel) {
-        let levelValue: Int
-        switch level {
+        let levelValue = switch level {
         case .debug:
-            levelValue = 0
+            0
         case .info:
-            levelValue = 1
+            1
         case .default:
-            levelValue = 2
+            2
         case .error:
-            levelValue = 16
+            16
         case .fault:
-            levelValue = 17
+            17
         }
         components.append("messageType >= \(levelValue)")
     }
@@ -215,19 +214,19 @@ public struct PredicateBuilder: Sendable {
     ) -> String? {
         var builder = PredicateBuilder()
 
-        if let process = process {
+        if let process {
             builder.process(process)
         }
-        if let pid = pid {
+        if let pid {
             builder.pid(pid)
         }
-        if let subsystem = subsystem {
+        if let subsystem {
             builder.subsystem(subsystem)
         }
-        if let category = category {
+        if let category {
             builder.category(category)
         }
-        if let level = level {
+        if let level {
             builder.level(level)
         }
 

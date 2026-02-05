@@ -5,13 +5,12 @@
 //  Created by Alex Maimescu on 03/02/2026.
 //
 
-import Testing
 import ArgumentParser
 @testable import slog
+import Testing
 
 @Suite("Duration Parser Tests")
 struct DurationParserTests {
-
     @Test("Parses seconds with 's' suffix")
     func parseSeconds() throws {
         let result = try DurationParser.parse("5s", optionName: "--timeout")

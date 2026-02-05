@@ -114,7 +114,8 @@ struct ListSimulators: ParsableCommand {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let devices = json["devices"] as? [String: [[String: Any]]] else {
+              let devices = json["devices"] as? [String: [[String: Any]]]
+        else {
             print("Failed to parse simulator list")
             return
         }
@@ -143,7 +144,7 @@ struct ListSimulators: ParsableCommand {
                 }
 
                 // Skip non-booted if --booted flag
-                if booted && state != "Booted" {
+                if booted, state != "Booted" {
                     continue
                 }
 
