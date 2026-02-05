@@ -45,6 +45,32 @@ struct Slog: AsyncParsableCommand {
 
               Duration format: 5s, 30s, 2m, 1h (seconds assumed if no suffix)
 
+            ━━━ SHOW COMMAND ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            Query historical/persisted logs from the macOS log archive.
+
+            Time Range Options:
+              --last <duration|boot>  Show logs from last duration (e.g., 5m, 1h) or boot
+              --start <date>          Start date (e.g., "2024-01-15 10:30:00")
+              --end <date>            End date (e.g., "2024-01-15 11:00:00")
+
+            Filter Options:
+              --process <name>        Filter by process name
+              --pid <id>              Filter by process ID
+              --subsystem <name>      Filter by subsystem
+              --category <name>       Filter by category
+              --level <level>         Minimum log level: debug, info, default, error, fault
+              --grep <pattern>        Filter messages by regex pattern
+
+            Output Options:
+              --format <fmt>          Output format: plain, compact, color (default), json
+              --info                  Include info-level messages
+              --debug                 Include debug-level messages
+              --count <n>             Maximum number of entries to display
+
+            Archive:
+              [archive-path]          Optional path to a .logarchive file
+
             ━━━ LIST COMMAND ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
             List available processes or simulators.
@@ -77,12 +103,21 @@ struct Slog: AsyncParsableCommand {
               slog stream --process MyApp --format compact
               slog stream --process MyApp --format json | jq '.message'
 
+            Historical logs:
+              slog show --last 5m
+              slog show --last 1h --process Finder
+              slog show --last 30s --level error
+              slog show --last boot --subsystem com.apple.network
+              slog show --start "2024-01-15 10:00:00" --end "2024-01-15 11:00:00"
+              slog show --last 5m --format json | jq '.message'
+              slog show /path/to/file.logarchive
+
             Discovery:
               slog list processes --filter finder
               slog list simulators --booted
             """,
         version: "1.0.0",
-        subcommands: [StreamCommand.self, ListCommand.self],
+        subcommands: [StreamCommand.self, ShowCommand.self, ListCommand.self],
         defaultSubcommand: StreamCommand.self
     )
 }

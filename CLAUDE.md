@@ -46,6 +46,34 @@ Stream logs from macOS or iOS Simulator.
 
 Duration format: `5s`, `30s`, `2m`, `1h` (seconds assumed if no suffix)
 
+### Show Command
+
+Query historical/persisted logs from the macOS log archive.
+
+**Time Range Options:**
+- `--last <duration|boot>` - Show logs from last duration (e.g., 5m, 1h) or boot
+- `--start <date>` - Start date (e.g., "2024-01-15 10:30:00")
+- `--end <date>` - End date (e.g., "2024-01-15 11:00:00")
+
+**Filter Options:**
+- `--process <name>` - Filter by process name
+- `--pid <id>` - Filter by process ID
+- `--subsystem <name>` - Filter by subsystem (e.g., com.apple.network)
+- `--category <name>` - Filter by category
+- `--level <level>` - Minimum log level: debug, info, default, error, fault
+- `--grep <pattern>` - Filter messages by regex pattern
+
+**Output Options:**
+- `--format <fmt>` - Output format: plain, compact, color (default), json
+- `--info` - Include info-level messages
+- `--debug` - Include debug-level messages
+- `--count <n>` - Maximum number of entries to display
+
+**Archive:**
+- `[archive-path]` - Optional path to a .logarchive file
+
+Requires at least `--last`, `--start`, or an archive path. `--last` and `--start`/`--end` are mutually exclusive.
+
 ### List Command
 
 - `list processes [--filter <name>]` - List running processes
@@ -69,6 +97,15 @@ slog stream --process MyApp --timeout 30s --capture 10s
 # Output formats
 slog stream --process MyApp --format compact
 slog stream --process MyApp --format json | jq '.message'
+
+# Historical logs
+slog show --last 5m
+slog show --last 1h --process Finder
+slog show --last 30s --level error
+slog show --last boot --subsystem com.apple.network
+slog show --start "2024-01-15 10:00:00" --end "2024-01-15 11:00:00"
+slog show --last 5m --format json | jq '.message'
+slog show /path/to/file.logarchive
 ```
 
 ### Exit Codes
@@ -81,13 +118,15 @@ slog stream --process MyApp --format json | jq '.message'
 ```
 Sources/slog/
 ├── Commands/           # CLI commands using ArgumentParser
-│   ├── RootCommand.swift    # @main entry point with 2 subcommands
+│   ├── RootCommand.swift    # @main entry point with 3 subcommands
 │   ├── StreamCommand.swift  # Main log streaming with filters
+│   ├── ShowCommand.swift    # Historical log queries
 │   └── ListCommand.swift    # List processes/simulators
 ├── Core/               # Log handling
 │   ├── LogEntry.swift       # LogEntry struct, LogLevel enum
 │   ├── LogParser.swift      # NDJSON and legacy format parser
-│   └── LogStreamer.swift    # Process management, PredicateBuilder
+│   ├── LogStreamer.swift    # Process management, PredicateBuilder
+│   └── LogReader.swift      # Historical log reading via `log show`
 ├── Filters/            # Filtering system
 │   ├── FilterChain.swift    # Thread-safe filter chain with DSL
 │   └── Predicates.swift     # 10+ predicate types (composable)
