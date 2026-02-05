@@ -28,7 +28,7 @@ struct ShowCommand: AsyncParsableCommand {
     var category: String?
 
     @Option(name: .long, help: "Minimum log level (debug, info, default, error, fault)")
-    var level: String?
+    var level: LogLevel?
 
     @Option(name: .long, help: "Filter messages by regex pattern")
     var grep: String?
@@ -36,7 +36,7 @@ struct ShowCommand: AsyncParsableCommand {
     // MARK: - Output Options
 
     @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
-    var format: String = "color"
+    var format: OutputFormat = .color
 
     @Flag(name: .long, help: "Include info-level messages")
     var info = false
@@ -90,22 +90,21 @@ struct ShowCommand: AsyncParsableCommand {
     // MARK: - Run
 
     func run() async throws {
-        let outputFormat = OutputFormat(rawValue: format) ?? .color
-        let formatter = FormatterRegistry.formatter(for: outputFormat)
+        let formatter = FormatterRegistry.formatter(for: format)
 
         // Build server-side predicate
-        let predicate = PredicateBuilder.from(
+        let predicate = PredicateBuilder.buildPredicate(
             process: process,
             pid: pid,
             subsystem: subsystem,
             category: category,
-            level: level.flatMap { LogLevel(string: $0) }
+            level: level
         )
 
         // Build client-side filter chain for regex
         var filterChain = FilterChain()
         if let grepPattern = grep {
-            filterChain.filterByMessageRegex(grepPattern)
+            filterChain.messageRegex(grepPattern)
         }
 
         // Determine time range
@@ -122,8 +121,6 @@ struct ShowCommand: AsyncParsableCommand {
             } else {
                 timeRange = .start(start)
             }
-        } else if let end = end {
-            timeRange = .end(end)
         } else {
             timeRange = nil
         }

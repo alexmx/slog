@@ -5,6 +5,7 @@
 //  Created by Alex Maimescu on 02/02/2026.
 //
 
+import ArgumentParser
 import Foundation
 
 /// Represents the severity level of a log entry
@@ -44,8 +45,18 @@ public enum LogLevel: String, Codable, CaseIterable, Comparable, Sendable {
     }
 }
 
+extension LogLevel: ExpressibleByArgument {
+    public init?(argument: String) {
+        self.init(string: argument)
+    }
+
+    public static var allValueStrings: [String] {
+        ["debug", "info", "default", "error", "fault"]
+    }
+}
+
 /// Represents a single parsed log entry from the log stream
-public struct LogEntry: Codable, Sendable {
+public struct LogEntry: Codable, Sendable, Equatable {
     /// Timestamp of the log entry
     public let timestamp: Date
 
@@ -76,6 +87,18 @@ public struct LogEntry: Codable, Sendable {
     /// Trace ID if available
     public let traceID: Int?
 
+    /// Full path to the process binary
+    public let processImagePath: String?
+
+    /// Library/framework that emitted the log
+    public let senderImagePath: String?
+
+    /// Event type (e.g., "logEvent", "activityCreateEvent", "traceEvent", "signpostEvent")
+    public let eventType: String?
+
+    /// Source location info (file/function/line when --source is used)
+    public let source: String?
+
     public init(
         timestamp: Date,
         processName: String,
@@ -86,7 +109,11 @@ public struct LogEntry: Codable, Sendable {
         message: String,
         threadID: Int? = nil,
         activityID: Int? = nil,
-        traceID: Int? = nil
+        traceID: Int? = nil,
+        processImagePath: String? = nil,
+        senderImagePath: String? = nil,
+        eventType: String? = nil,
+        source: String? = nil
     ) {
         self.timestamp = timestamp
         self.processName = processName
@@ -98,6 +125,10 @@ public struct LogEntry: Codable, Sendable {
         self.threadID = threadID
         self.activityID = activityID
         self.traceID = traceID
+        self.processImagePath = processImagePath
+        self.senderImagePath = senderImagePath
+        self.eventType = eventType
+        self.source = source
     }
 }
 
@@ -115,6 +146,11 @@ extension LogEntry: CustomStringConvertible {
 
         if let category = category {
             components.append("[\(category)]")
+        }
+
+        if let senderImagePath = senderImagePath {
+            let senderName = URL(fileURLWithPath: senderImagePath).lastPathComponent
+            components.append("<\(senderName)>")
         }
 
         components.append(message)

@@ -137,10 +137,10 @@ public struct MessageRegexPredicate: LogPredicate {
     private let pattern: String
     private let regex: NSRegularExpression?
 
-    public init(pattern: String, caseInsensitive: Bool = true) {
+    public init(pattern: String, caseSensitive: Bool = false) {
         self.pattern = pattern
         var options: NSRegularExpression.Options = []
-        if caseInsensitive {
+        if !caseSensitive {
             options.insert(.caseInsensitive)
         }
         self.regex = try? NSRegularExpression(pattern: pattern, options: options)

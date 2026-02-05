@@ -59,6 +59,10 @@ private struct ToonOutput: Encodable {
     let category: String?
     let threadID: Int?
     let activityID: Int?
+    let processImagePath: String?
+    let senderImagePath: String?
+    let eventType: String?
+    let source: String?
 
     init(from entry: LogEntry) {
         timestamp = entry.timestamp
@@ -70,5 +74,9 @@ private struct ToonOutput: Encodable {
         category = entry.category
         threadID = entry.threadID
         activityID = entry.activityID
+        processImagePath = entry.processImagePath
+        senderImagePath = entry.senderImagePath
+        eventType = entry.eventType
+        source = entry.source
     }
 }

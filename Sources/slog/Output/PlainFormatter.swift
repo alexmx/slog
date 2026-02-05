@@ -9,7 +9,6 @@ import Foundation
 
 /// Plain text formatter for log entries
 public struct PlainFormatter: LogFormatter {
-    private let dateFormatter: DateFormatter
     private let showTimestamp: Bool
     private let showLevel: Bool
     private let showProcess: Bool
@@ -25,15 +24,14 @@ public struct PlainFormatter: LogFormatter {
         self.showLevel = showLevel
         self.showProcess = showProcess
         self.showSubsystem = showSubsystem
-
-        dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "HH:mm:ss.SSS"
     }
 
     public func format(_ entry: LogEntry) -> String {
         var components: [String] = []
 
         if showTimestamp {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "HH:mm:ss.SSS"
             components.append(dateFormatter.string(from: entry.timestamp))
         }
 

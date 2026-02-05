@@ -10,7 +10,6 @@ import Rainbow
 
 /// Colored output formatter using ANSI colors
 public struct ColorFormatter: LogFormatter {
-    private let dateFormatter: DateFormatter
     private let showTimestamp: Bool
     private let showLevel: Bool
     private let showProcess: Bool
@@ -29,15 +28,14 @@ public struct ColorFormatter: LogFormatter {
         self.showProcess = showProcess
         self.showSubsystem = showSubsystem
         self.highlightPattern = highlightPattern
-
-        dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "HH:mm:ss.SSS"
     }
 
     public func format(_ entry: LogEntry) -> String {
         var components: [String] = []
 
         if showTimestamp {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "HH:mm:ss.SSS"
             let timestamp = dateFormatter.string(from: entry.timestamp)
             components.append(timestamp.lightBlack)
         }

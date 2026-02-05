@@ -8,9 +8,9 @@ import Subprocess
 import System
 
 /// Configuration for querying historical logs via `log show`
-public struct ShowConfiguration: Sendable {
+public struct ShowConfiguration: Sendable, Equatable {
     /// Time range for the log query
-    public enum TimeRange: Sendable {
+    public enum TimeRange: Sendable, Equatable {
         /// Show logs from the last N seconds/minutes/hours (e.g., "5m", "1h")
         case last(String)
         /// Show logs from the last boot
@@ -19,8 +19,6 @@ public struct ShowConfiguration: Sendable {
         case start(String)
         /// Show logs in a date range
         case range(start: String, end: String)
-        /// Show logs up to a specific date
-        case end(String)
     }
 
     /// The time range to query
@@ -57,8 +55,8 @@ public struct ShowConfiguration: Sendable {
 public struct LogReader: Sendable {
     private let parser: LogParser
 
-    public init() {
-        self.parser = LogParser()
+    public init(parser: LogParser = LogParser()) {
+        self.parser = parser
     }
 
     /// Read log entries asynchronously
@@ -129,9 +127,6 @@ public struct LogReader: Sendable {
                 args.append(start)
                 args.append("--end")
                 args.append(end)
-            case .end(let date):
-                args.append("--end")
-                args.append(date)
             }
         }
 

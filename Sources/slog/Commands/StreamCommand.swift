@@ -38,7 +38,7 @@ struct StreamCommand: AsyncParsableCommand {
     var category: String?
 
     @Option(name: .long, help: "Minimum log level (debug, info, default, error, fault)")
-    var level: String?
+    var level: LogLevel?
 
     @Option(name: .long, help: "Filter messages by regex pattern")
     var grep: String?
@@ -46,7 +46,7 @@ struct StreamCommand: AsyncParsableCommand {
     // MARK: - Output Options
 
     @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
-    var format: String = "color"
+    var format: OutputFormat = .color
 
     @Flag(name: .long, help: "Include info-level messages")
     var info = false
@@ -69,11 +69,11 @@ struct StreamCommand: AsyncParsableCommand {
 
     func validate() throws {
         if let timeout = timeout {
-            _ = try parseDuration(timeout, optionName: "--timeout")
+            _ = try DurationParser.parse(timeout, optionName: "--timeout")
         }
 
         if let capture = capture {
-            _ = try parseDuration(capture, optionName: "--capture")
+            _ = try DurationParser.parse(capture, optionName: "--capture")
         }
 
         if let count = count, count <= 0 {
@@ -85,22 +85,21 @@ struct StreamCommand: AsyncParsableCommand {
 
     func run() async throws {
         // Determine output format
-        let outputFormat = OutputFormat(rawValue: format) ?? .color
-        let formatter = FormatterRegistry.formatter(for: outputFormat)
+        let formatter = FormatterRegistry.formatter(for: format)
 
         // Build server-side predicate
-        let predicate = PredicateBuilder.from(
+        let predicate = PredicateBuilder.buildPredicate(
             process: process,
             pid: pid,
             subsystem: subsystem,
             category: category,
-            level: level.flatMap { LogLevel(string: $0) }
+            level: level
         )
 
         // Build client-side filter chain for regex
         var filterChain = FilterChain()
         if let grepPattern = grep {
-            filterChain.filterByMessageRegex(grepPattern)
+            filterChain.messageRegex(grepPattern)
         }
 
         // Determine target
@@ -127,8 +126,8 @@ struct StreamCommand: AsyncParsableCommand {
         )
 
         // Parse timing options
-        let timeoutInterval = try timeout.map { try parseDuration($0, optionName: "--timeout") }
-        let captureInterval = try capture.map { try parseDuration($0, optionName: "--capture") }
+        let timeoutInterval = try timeout.map { try DurationParser.parse($0, optionName: "--timeout") }
+        let captureInterval = try capture.map { try DurationParser.parse($0, optionName: "--capture") }
         let maxCount = count
 
         // Create streamer
@@ -282,7 +281,7 @@ struct StreamCommand: AsyncParsableCommand {
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let devices = json["devices"] as? [String: [[String: Any]]] else {
-            throw StreamerError.simulatorNotFound("Could not parse simulator list")
+            throw StreamError.simulatorNotFound("Could not parse simulator list")
         }
 
         // Find first booted device
@@ -295,7 +294,7 @@ struct StreamCommand: AsyncParsableCommand {
             }
         }
 
-        throw StreamerError.simulatorNotFound("No booted simulator found. Boot a simulator or specify --simulator-udid")
+        throw StreamError.simulatorNotFound("No booted simulator found. Boot a simulator or specify --simulator-udid")
     }
 }
 
@@ -307,7 +306,6 @@ private actor StreamState {
         case timeout
         case captureComplete
         case countReached
-        case interrupted
         case error(Error)
     }
 
@@ -331,37 +329,3 @@ private actor StreamState {
     }
 }
 
-// MARK: - Duration Parsing
-
-/// Parse a duration string like "5s", "2m", "1h" into seconds
-func parseDuration(_ string: String, optionName: String) throws -> TimeInterval {
-    let trimmed = string.trimmingCharacters(in: .whitespaces)
-    guard !trimmed.isEmpty else {
-        throw ValidationError("\(optionName) cannot be empty")
-    }
-
-    let lastChar = trimmed.last!
-    let multiplier: Double
-    let numberString: String
-
-    switch lastChar {
-    case "s", "S":
-        multiplier = 1.0
-        numberString = String(trimmed.dropLast())
-    case "m", "M":
-        multiplier = 60.0
-        numberString = String(trimmed.dropLast())
-    case "h", "H":
-        multiplier = 3600.0
-        numberString = String(trimmed.dropLast())
-    default:
-        multiplier = 1.0
-        numberString = trimmed
-    }
-
-    guard let value = Double(numberString), value > 0 else {
-        throw ValidationError("\(optionName) must be a positive number with optional suffix (s, m, h). Got: \(string)")
-    }
-
-    return value * multiplier
-}

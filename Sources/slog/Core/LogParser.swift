@@ -243,7 +243,11 @@ private struct RawLogEntry: Decodable {
             message: eventMessage ?? "",
             threadID: threadID,
             activityID: activityIdentifier,
-            traceID: traceID
+            traceID: traceID,
+            processImagePath: processImagePath,
+            senderImagePath: senderImagePath,
+            eventType: eventType,
+            source: source
         )
     }
 

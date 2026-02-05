@@ -5,10 +5,11 @@
 //  Created by Alex Maimescu on 02/02/2026.
 //
 
+import ArgumentParser
 import Foundation
 
 /// Output format options
-public enum OutputFormat: String, CaseIterable, Sendable {
+public enum OutputFormat: String, CaseIterable, Sendable, CustomStringConvertible, ExpressibleByArgument {
     case plain
     case compact
     case color
@@ -38,7 +39,7 @@ public protocol LogFormatter: Sendable {
 }
 
 /// Registry for available formatters
-public struct FormatterRegistry {
+public enum FormatterRegistry {
     public static func formatter(for format: OutputFormat) -> any LogFormatter {
         switch format {
         case .plain:

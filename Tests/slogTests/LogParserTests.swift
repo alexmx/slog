@@ -16,7 +16,7 @@ struct LogParserTests {
     @Test("Parse valid NDJSON log entry")
     func parseValidNDJSON() throws {
         let json = """
-        {"timestamp":"2024-01-15T10:30:45.123456Z","processImagePath":"/Applications/Finder.app/Contents/MacOS/Finder","processID":1234,"subsystem":"com.apple.finder","category":"default","messageType":"Info","eventMessage":"Test message"}
+        {"timestamp":"2024-01-15T10:30:45.123456Z","processImagePath":"/Applications/Finder.app/Contents/MacOS/Finder","processID":1234,"senderImagePath":"/usr/lib/libnetwork.dylib","subsystem":"com.apple.finder","category":"default","messageType":"Info","eventType":"logEvent","eventMessage":"Test message","source":"MyFile.swift:42"}
         """
 
         let entry = parser.parse(line: json)
@@ -28,6 +28,10 @@ struct LogParserTests {
         #expect(entry?.category == "default")
         #expect(entry?.level == .info)
         #expect(entry?.message == "Test message")
+        #expect(entry?.processImagePath == "/Applications/Finder.app/Contents/MacOS/Finder")
+        #expect(entry?.senderImagePath == "/usr/lib/libnetwork.dylib")
+        #expect(entry?.eventType == "logEvent")
+        #expect(entry?.source == "MyFile.swift:42")
     }
 
     @Test("Parse log entry with missing optional fields")
@@ -44,6 +48,10 @@ struct LogParserTests {
         #expect(entry?.subsystem == nil)
         #expect(entry?.category == nil)
         #expect(entry?.level == .error)
+        #expect(entry?.senderImagePath == nil)
+        #expect(entry?.eventType == nil)
+        #expect(entry?.source == nil)
+        #expect(entry?.processImagePath == "/usr/bin/test")
     }
 
     @Test("Parse empty line returns nil")

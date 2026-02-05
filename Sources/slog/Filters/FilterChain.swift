@@ -20,49 +20,49 @@ public struct FilterChain: Sendable {
 
     /// Add a process name filter
     @discardableResult
-    public mutating func filterByProcess(_ name: String) -> FilterChain {
+    public mutating func process(_ name: String) -> FilterChain {
         add(ProcessNamePredicate(processName: name))
         return self
     }
 
     /// Add a process ID filter
     @discardableResult
-    public mutating func filterByPID(_ pid: Int) -> FilterChain {
+    public mutating func pid(_ pid: Int) -> FilterChain {
         add(ProcessIDPredicate(pid: pid))
         return self
     }
 
     /// Add a subsystem filter
     @discardableResult
-    public mutating func filterBySubsystem(_ subsystem: String, matchPrefix: Bool = false) -> FilterChain {
+    public mutating func subsystem(_ subsystem: String, matchPrefix: Bool = false) -> FilterChain {
         add(SubsystemPredicate(subsystem: subsystem, matchPrefix: matchPrefix))
         return self
     }
 
     /// Add a category filter
     @discardableResult
-    public mutating func filterByCategory(_ category: String) -> FilterChain {
+    public mutating func category(_ category: String) -> FilterChain {
         add(CategoryPredicate(category: category))
         return self
     }
 
     /// Add a minimum log level filter
     @discardableResult
-    public mutating func filterByMinimumLevel(_ level: LogLevel) -> FilterChain {
+    public mutating func minimumLevel(_ level: LogLevel) -> FilterChain {
         add(MinimumLevelPredicate(minimumLevel: level))
         return self
     }
 
     /// Add a message substring filter
     @discardableResult
-    public mutating func filterByMessageContaining(_ substring: String) -> FilterChain {
+    public mutating func messageContains(_ substring: String) -> FilterChain {
         add(MessageContainsPredicate(substring: substring))
         return self
     }
 
     /// Add a regex filter on the message
     @discardableResult
-    public mutating func filterByMessageRegex(_ pattern: String) -> FilterChain {
+    public mutating func messageRegex(_ pattern: String) -> FilterChain {
         add(MessageRegexPredicate(pattern: pattern))
         return self
     }
@@ -90,6 +90,13 @@ public struct FilterChain: Sendable {
     /// Number of predicates in the chain
     public var count: Int {
         predicates.count
+    }
+
+    /// Build a filter chain using a closure-based DSL
+    public static func build(_ configure: (inout FilterChainBuilder) -> Void) -> FilterChain {
+        var builder = FilterChainBuilder()
+        configure(&builder)
+        return builder.build()
     }
 }
 
@@ -138,9 +145,3 @@ public struct FilterChainBuilder {
     }
 }
 
-/// Build a filter chain using a closure-based DSL
-public func buildFilterChain(_ configure: (inout FilterChainBuilder) -> Void) -> FilterChain {
-    var builder = FilterChainBuilder()
-    configure(&builder)
-    return builder.build()
-}

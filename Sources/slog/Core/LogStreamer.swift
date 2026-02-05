@@ -10,9 +10,9 @@ import Subprocess
 import System
 
 /// Configuration for log streaming
-public struct StreamConfiguration: Sendable {
+public struct StreamConfiguration: Sendable, Equatable {
     /// Target for log streaming
-    public enum Target: Sendable {
+    public enum Target: Sendable, Equatable {
         /// Stream from the local macOS system
         case local
         /// Stream from an iOS Simulator with the given UDID
@@ -48,8 +48,8 @@ public struct StreamConfiguration: Sendable {
 public struct LogStreamer: Sendable {
     private let parser: LogParser
 
-    public init() {
-        self.parser = LogParser()
+    public init(parser: LogParser = LogParser()) {
+        self.parser = parser
     }
 
     /// Stream log entries asynchronously
@@ -78,7 +78,7 @@ public struct LogStreamer: Sendable {
 
                     // Check termination status
                     if case .exited(let code) = result.terminationStatus, code != 0 {
-                        continuation.finish(throwing: StreamerError.logStreamError("Process exited with code \(code)"))
+                        continuation.finish(throwing: StreamError.logStreamError("Process exited with code \(code)"))
                     } else {
                         continuation.finish()
                     }
@@ -95,7 +95,7 @@ public struct LogStreamer: Sendable {
 
     // MARK: - Private
 
-    private func buildCommand(for configuration: StreamConfiguration) -> (Executable, [String]) {
+    func buildCommand(for configuration: StreamConfiguration) -> (Executable, [String]) {
         var args = ["stream", "--style", "ndjson"]
 
         if configuration.includeInfo {
@@ -124,15 +124,12 @@ public struct LogStreamer: Sendable {
 
 // MARK: - Errors
 
-public enum StreamerError: Error, LocalizedError {
-    case alreadyRunning
+public enum StreamError: Error, LocalizedError {
     case logStreamError(String)
     case simulatorNotFound(String)
 
     public var errorDescription: String? {
         switch self {
-        case .alreadyRunning:
-            return "Log streamer is already running"
         case .logStreamError(let message):
             return "Log stream error: \(message)"
         case .simulatorNotFound(let udid):
@@ -199,8 +196,8 @@ public struct PredicateBuilder: Sendable {
         return components.joined(separator: " AND ")
     }
 
-    /// Create a predicate from common filter options
-    public static func from(
+    /// Create a predicate string from common filter options
+    public static func buildPredicate(
         process: String? = nil,
         pid: Int? = nil,
         subsystem: String? = nil,
