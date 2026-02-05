@@ -16,7 +16,7 @@ struct LogParserTests {
     @Test("Parse valid NDJSON log entry")
     func parseValidNDJSON() throws {
         let json = """
-        {"timestamp":"2024-01-15T10:30:45.123456Z","processImagePath":"/Applications/Finder.app/Contents/MacOS/Finder","processID":1234,"senderImagePath":"/usr/lib/libnetwork.dylib","subsystem":"com.apple.finder","category":"default","messageType":"Info","eventType":"logEvent","eventMessage":"Test message","source":"MyFile.swift:42"}
+        {"timestamp":"2024-01-15T10:30:45.123456Z","processImagePath":"/Applications/Finder.app/Contents/MacOS/Finder","processID":1234,"senderImagePath":"/usr/lib/libnetwork.dylib","subsystem":"com.apple.finder","category":"default","messageType":"Info","eventType":"logEvent","eventMessage":"Test message","source":{"symbol":"-[MyClass doThing]","file":"MyFile.swift","line":42,"image":"MyFramework"}}
         """
 
         let entry = parser.parse(line: json)
@@ -31,7 +31,7 @@ struct LogParserTests {
         #expect(entry?.processImagePath == "/Applications/Finder.app/Contents/MacOS/Finder")
         #expect(entry?.senderImagePath == "/usr/lib/libnetwork.dylib")
         #expect(entry?.eventType == "logEvent")
-        #expect(entry?.source == "MyFile.swift:42")
+        #expect(entry?.source == "MyFramework -[MyClass doThing] MyFile.swift:42")
     }
 
     @Test("Parse log entry with missing optional fields")

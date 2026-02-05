@@ -44,6 +44,9 @@ struct ShowCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Include debug-level messages")
     var debug = false
 
+    @Flag(name: .long, help: "Include source location (file, function, line) in log entries")
+    var source = false
+
     // MARK: - Time Range Options
 
     @Option(name: .long, help: "Show logs from last duration or boot (e.g., 5m, 1h, boot)")
@@ -136,7 +139,8 @@ struct ShowCommand: AsyncParsableCommand {
             archivePath: archivePath,
             predicate: predicate,
             includeInfo: includeInfoLogs,
-            includeDebug: includeDebugLogs
+            includeDebug: includeDebugLogs,
+            includeSource: source
         )
 
         // Create reader and iterate

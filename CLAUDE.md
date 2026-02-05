@@ -127,14 +127,15 @@ Sources/slog/
 ├── Core/               # Log handling
 │   ├── LogEntry.swift       # LogEntry struct, LogLevel enum
 │   ├── LogParser.swift      # NDJSON and legacy format parser
-│   ├── LogStreamer.swift    # Process management, PredicateBuilder
-│   └── LogReader.swift      # Historical log reading via `log show`
+│   ├── LogStreamer.swift    # Stream process management, PredicateBuilder
+│   ├── LogReader.swift      # Historical log reading via `log show`
+│   └── DurationParser.swift # Duration string parsing (e.g., "5s", "2m")
 ├── Filters/            # Filtering system
 │   ├── FilterChain.swift    # Thread-safe filter chain with DSL
 │   └── Predicates.swift     # 10+ predicate types (composable)
 └── Output/             # Formatters
     ├── Formatter.swift      # Protocol, registry, OutputFormat enum
-    └── *Formatter.swift     # Plain, Color, JSON implementations
+    └── *Formatter.swift     # Plain, Color, JSON, Toon implementations
 ```
 
 **Key patterns:**

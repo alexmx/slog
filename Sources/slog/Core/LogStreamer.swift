@@ -31,16 +31,21 @@ public struct StreamConfiguration: Sendable, Equatable {
     /// Whether to include debug-level messages
     public let includeDebug: Bool
 
+    /// Whether to include source location info
+    public let includeSource: Bool
+
     public init(
         target: Target = .local,
         predicate: String? = nil,
         includeInfo: Bool = true,
-        includeDebug: Bool = false
+        includeDebug: Bool = false,
+        includeSource: Bool = false
     ) {
         self.target = target
         self.predicate = predicate
         self.includeInfo = includeInfo
         self.includeDebug = includeDebug
+        self.includeSource = includeSource
     }
 }
 
@@ -104,6 +109,10 @@ public struct LogStreamer: Sendable {
 
         if configuration.includeDebug {
             args.append("--debug")
+        }
+
+        if configuration.includeSource {
+            args.append("--source")
         }
 
         if let predicate = configuration.predicate {

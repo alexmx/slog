@@ -54,6 +54,9 @@ struct StreamCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Include debug-level messages")
     var debug = false
 
+    @Flag(name: .long, help: "Include source location (file, function, line) in log entries")
+    var source = false
+
     // MARK: - Timing Options
 
     @Option(name: .long, help: "Maximum wait time for first log entry (e.g., 5s, 1m)")
@@ -122,7 +125,8 @@ struct StreamCommand: AsyncParsableCommand {
             target: target,
             predicate: predicate,
             includeInfo: includeInfoLogs,
-            includeDebug: includeDebugLogs
+            includeDebug: includeDebugLogs,
+            includeSource: source
         )
 
         // Parse timing options

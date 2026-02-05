@@ -201,8 +201,38 @@ private struct RawLogEntry: Decodable {
     let processImageUUID: String?
     let senderImageUUID: String?
     let creatorActivityID: Int?
-    let source: String?
+    let source: SourceInfo?
     let backtrace: BacktraceInfo?
+
+    struct SourceInfo: Decodable {
+        let symbol: String?
+        let file: String?
+        let line: Int?
+        let image: String?
+
+        /// Format source info into a human-readable string
+        func formatted() -> String? {
+            var parts: [String] = []
+
+            if let image = image, !image.isEmpty {
+                parts.append(image)
+            }
+
+            if let symbol = symbol, !symbol.isEmpty {
+                parts.append(symbol)
+            }
+
+            if let file = file, !file.isEmpty {
+                if let line = line, line > 0 {
+                    parts.append("\(file):\(line)")
+                } else {
+                    parts.append(file)
+                }
+            }
+
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        }
+    }
 
     struct BacktraceInfo: Decodable {
         let frames: [FrameInfo]?
@@ -247,7 +277,7 @@ private struct RawLogEntry: Decodable {
             processImagePath: processImagePath,
             senderImagePath: senderImagePath,
             eventType: eventType,
-            source: source
+            source: source?.formatted()
         )
     }
 
