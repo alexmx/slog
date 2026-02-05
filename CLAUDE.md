@@ -35,7 +35,7 @@ Stream logs from macOS or iOS Simulator.
 - `--grep <pattern>` - Filter messages by regex pattern
 
 **Output Options:**
-- `--format <fmt>` - Output format: plain, compact, color (default), json
+- `--format <fmt>` - Output format: plain, compact, color (default), json, toon
 - `--info` - Include info-level messages
 - `--debug` - Include debug-level messages
 
@@ -64,7 +64,7 @@ Query historical/persisted logs from the macOS log archive.
 - `--grep <pattern>` - Filter messages by regex pattern
 
 **Output Options:**
-- `--format <fmt>` - Output format: plain, compact, color (default), json
+- `--format <fmt>` - Output format: plain, compact, color (default), json, toon
 - `--info` - Include info-level messages
 - `--debug` - Include debug-level messages
 - `--count <n>` - Maximum number of entries to display
@@ -153,6 +153,7 @@ Ordered from most to least verbose: debug (0), info (1), default (2), error (16)
 - `compact` - Minimal: timestamp, level, message only
 - `color` - Same as plain with ANSI colors based on log level (default)
 - `json` - JSON output for piping to other tools
+- `toon` - TOON output (token-optimized for LLMs)
 
 ## Testing
 
@@ -170,6 +171,7 @@ swift test --filter <name>    # Run specific test
 - `swift-argument-parser` - CLI parsing and command structure
 - `swift-subprocess` - Modern async process execution
 - `Rainbow` - ANSI color support for terminal output
+- `ToonFormat` - TOON (Token-Oriented Object Notation) encoding
 
 ## Git Commits
 

@@ -34,7 +34,7 @@ struct Slog: AsyncParsableCommand {
               --grep <pattern>        Filter messages by regex pattern
 
             Output Options:
-              --format <fmt>          Output format: plain, compact, color (default), json
+              --format <fmt>          Output format: plain, compact, color (default), json, toon
               --info                  Include info-level messages
               --debug                 Include debug-level messages
 
@@ -63,7 +63,7 @@ struct Slog: AsyncParsableCommand {
               --grep <pattern>        Filter messages by regex pattern
 
             Output Options:
-              --format <fmt>          Output format: plain, compact, color (default), json
+              --format <fmt>          Output format: plain, compact, color (default), json, toon
               --info                  Include info-level messages
               --debug                 Include debug-level messages
               --count <n>             Maximum number of entries to display

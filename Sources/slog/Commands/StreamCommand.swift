@@ -45,7 +45,7 @@ struct StreamCommand: AsyncParsableCommand {
 
     // MARK: - Output Options
 
-    @Option(name: .long, help: "Output format (plain, compact, color, json)")
+    @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
     var format: String = "color"
 
     @Flag(name: .long, help: "Include info-level messages")

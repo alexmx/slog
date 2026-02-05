@@ -13,6 +13,7 @@ public enum OutputFormat: String, CaseIterable, Sendable {
     case compact
     case color
     case json
+    case toon
 
     public var description: String {
         switch self {
@@ -24,6 +25,8 @@ public enum OutputFormat: String, CaseIterable, Sendable {
             return "Colored output based on log level"
         case .json:
             return "JSON output for piping to other tools"
+        case .toon:
+            return "TOON output (token-optimized for LLMs)"
         }
     }
 }
@@ -46,6 +49,8 @@ public struct FormatterRegistry {
             return ColorFormatter()
         case .json:
             return JSONFormatter()
+        case .toon:
+            return ToonFormatter()
         }
     }
 }
