@@ -110,7 +110,7 @@ struct StreamCommand: AsyncParsableCommand {
         let effectiveSimulatorUDID = simulatorUDID ?? prof?.simulatorUDID
 
         // Determine output format
-        let formatter = FormatterRegistry.formatter(for: effectiveFormat)
+        let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep)
 
         // Build server-side predicate
         let predicate = PredicateBuilder.buildPredicate(

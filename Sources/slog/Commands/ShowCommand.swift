@@ -113,7 +113,7 @@ struct ShowCommand: AsyncParsableCommand {
         let effectiveDebug = debug ?? prof?.debug ?? false
         let effectiveSource = source ?? prof?.source ?? false
 
-        let formatter = FormatterRegistry.formatter(for: effectiveFormat)
+        let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep)
 
         // Build server-side predicate
         let predicate = PredicateBuilder.buildPredicate(

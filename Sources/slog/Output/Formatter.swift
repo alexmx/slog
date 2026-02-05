@@ -40,14 +40,14 @@ public protocol LogFormatter: Sendable {
 
 /// Registry for available formatters
 public enum FormatterRegistry {
-    public static func formatter(for format: OutputFormat) -> any LogFormatter {
+    public static func formatter(for format: OutputFormat, highlightPattern: String? = nil) -> any LogFormatter {
         switch format {
         case .plain:
             return PlainFormatter()
         case .compact:
-            return PlainFormatter(showProcess: false, showSubsystem: false)
+            return ColorFormatter(showProcess: false, showSubsystem: false, highlightPattern: highlightPattern)
         case .color:
-            return ColorFormatter()
+            return ColorFormatter(highlightPattern: highlightPattern)
         case .json:
             return JSONFormatter()
         case .toon:
