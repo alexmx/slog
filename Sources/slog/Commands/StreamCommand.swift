@@ -15,6 +15,11 @@ struct StreamCommand: AsyncParsableCommand {
         abstract: "Stream logs from macOS or iOS Simulator"
     )
 
+    // MARK: - Profile
+
+    @Option(name: .long, help: "Load settings from a saved profile")
+    var profile: String?
+
     // MARK: - Target Options
 
     @Option(name: .long, help: "Filter by process name")
@@ -46,16 +51,16 @@ struct StreamCommand: AsyncParsableCommand {
     // MARK: - Output Options
 
     @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
-    var format: OutputFormat = .color
+    var format: OutputFormat?
 
-    @Flag(name: .long, help: "Include info-level messages")
-    var info = false
+    @Flag(name: .long, inversion: .prefixedNo, help: "Include info-level messages")
+    var info: Bool?
 
-    @Flag(name: .long, help: "Include debug-level messages")
-    var debug = false
+    @Flag(name: .long, inversion: .prefixedNo, help: "Include debug-level messages")
+    var debug: Bool?
 
-    @Flag(name: .long, help: "Include source location (file, function, line) in log entries")
-    var source = false
+    @Flag(name: .long, inversion: .prefixedNo, help: "Include source location info")
+    var source: Bool?
 
     // MARK: - Timing Options
 
@@ -87,28 +92,45 @@ struct StreamCommand: AsyncParsableCommand {
     // MARK: - Run
 
     func run() async throws {
+        // Load profile if specified
+        let prof = try profile.map { try ProfileManager.load($0) }
+
+        // Merge CLI args with profile (CLI wins when non-nil)
+        let effectiveProcess = process ?? prof?.process
+        let effectivePid = pid ?? prof?.pid
+        let effectiveSubsystem = subsystem ?? prof?.subsystem
+        let effectiveCategory = category ?? prof?.category
+        let effectiveLevel = level ?? prof?.resolvedLevel
+        let effectiveGrep = grep ?? prof?.grep
+        let effectiveFormat = format ?? prof?.resolvedFormat ?? .color
+        let effectiveInfo = info ?? prof?.info ?? false
+        let effectiveDebug = debug ?? prof?.debug ?? false
+        let effectiveSource = source ?? prof?.source ?? false
+        let effectiveSimulator = simulator || (prof?.simulator ?? false)
+        let effectiveSimulatorUDID = simulatorUDID ?? prof?.simulatorUDID
+
         // Determine output format
-        let formatter = FormatterRegistry.formatter(for: format)
+        let formatter = FormatterRegistry.formatter(for: effectiveFormat)
 
         // Build server-side predicate
         let predicate = PredicateBuilder.buildPredicate(
-            process: process,
-            pid: pid,
-            subsystem: subsystem,
-            category: category,
-            level: level
+            process: effectiveProcess,
+            pid: effectivePid,
+            subsystem: effectiveSubsystem,
+            category: effectiveCategory,
+            level: effectiveLevel
         )
 
         // Build client-side filter chain for regex
         var filterChain = FilterChain()
-        if let grepPattern = grep {
+        if let grepPattern = effectiveGrep {
             filterChain.messageRegex(grepPattern)
         }
 
         // Determine target
         let target: StreamConfiguration.Target
-        if simulator {
-            let udid = try resolveSimulatorUDID()
+        if effectiveSimulator {
+            let udid = try resolveSimulatorUDID(effectiveSimulatorUDID)
             target = .simulator(udid: udid)
         } else {
             target = .local
@@ -116,9 +138,9 @@ struct StreamCommand: AsyncParsableCommand {
 
         // Determine log level inclusion
         // Auto-enable debug when filtering by subsystem (unless explicit level set)
-        let autoDebug = subsystem != nil && level == nil && !info && !debug
-        let includeDebugLogs = debug || autoDebug
-        let includeInfoLogs = info || includeDebugLogs
+        let autoDebug = effectiveSubsystem != nil && effectiveLevel == nil && !effectiveInfo && !effectiveDebug
+        let includeDebugLogs = effectiveDebug || autoDebug
+        let includeInfoLogs = effectiveInfo || includeDebugLogs
 
         // Create configuration
         let config = StreamConfiguration(
@@ -126,7 +148,7 @@ struct StreamCommand: AsyncParsableCommand {
             predicate: predicate,
             includeInfo: includeInfoLogs,
             includeDebug: includeDebugLogs,
-            includeSource: source
+            includeSource: effectiveSource
         )
 
         // Parse timing options
@@ -265,8 +287,8 @@ struct StreamCommand: AsyncParsableCommand {
 
     // MARK: - Helpers
 
-    private func resolveSimulatorUDID() throws -> String {
-        if let udid = simulatorUDID {
+    private func resolveSimulatorUDID(_ udid: String? = nil) throws -> String {
+        if let udid = udid {
             return udid
         }
 

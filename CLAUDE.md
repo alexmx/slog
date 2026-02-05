@@ -76,6 +76,17 @@ Query historical/persisted logs from the macOS log archive.
 
 Requires at least `--last`, `--start`, or an archive path. `--last` and `--start`/`--end` are mutually exclusive.
 
+### Profile Command
+
+Manage saved filter/format profiles. Profiles are stored as JSON in `$XDG_CONFIG_HOME/slog/profiles/` (defaults to `~/.config/slog/profiles/`).
+
+- `profile create <name> [options]` - Create a profile from CLI flags (`--force` to overwrite)
+- `profile list` - List available profiles
+- `profile show <name>` - Show profile contents
+- `profile delete <name>` - Delete a profile
+
+Both `stream` and `show` accept `--profile <name>` to load a saved profile. CLI args override profile values. Use `--no-info`, `--no-debug`, `--no-source` to explicitly disable profile flags.
+
 ### List Command
 
 - `list processes [--filter <name>]` - List running processes
@@ -108,6 +119,14 @@ slog show --last boot --subsystem com.apple.network
 slog show --start "2024-01-15 10:00:00" --end "2024-01-15 11:00:00"
 slog show --last 5m --format json | jq '.message'
 slog show /path/to/file.logarchive
+
+# Profiles
+slog profile create myapp --process MyApp --subsystem com.myapp --level debug --format compact
+slog stream --profile myapp
+slog stream --profile myapp --level error --format json
+slog profile list
+slog profile show myapp
+slog profile delete myapp
 ```
 
 ### Exit Codes
@@ -120,9 +139,10 @@ slog show /path/to/file.logarchive
 ```
 Sources/slog/
 ├── Commands/           # CLI commands using ArgumentParser
-│   ├── RootCommand.swift    # @main entry point with 3 subcommands
+│   ├── RootCommand.swift    # @main entry point with 4 subcommands
 │   ├── StreamCommand.swift  # Main log streaming with filters
 │   ├── ShowCommand.swift    # Historical log queries
+│   ├── ProfileCommand.swift # Profile management (create/list/show/delete)
 │   └── ListCommand.swift    # List processes/simulators
 ├── Core/               # Log handling
 │   ├── LogEntry.swift       # LogEntry struct, LogLevel enum
@@ -130,6 +150,10 @@ Sources/slog/
 │   ├── LogStreamer.swift    # Stream process management, PredicateBuilder
 │   ├── LogReader.swift      # Historical log reading via `log show`
 │   └── DurationParser.swift # Duration string parsing (e.g., "5s", "2m")
+├── Config/             # Configuration and profiles
+│   ├── XDGDirectories.swift # XDG-compliant path resolution
+│   ├── Profile.swift        # Profile data model (Codable)
+│   └── ProfileManager.swift # Profile CRUD operations
 ├── Filters/            # Filtering system
 │   ├── FilterChain.swift    # Thread-safe filter chain with DSL
 │   └── Predicates.swift     # 10+ predicate types (composable)

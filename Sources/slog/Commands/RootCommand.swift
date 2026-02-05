@@ -112,12 +112,20 @@ struct Slog: AsyncParsableCommand {
               slog show --last 5m --format json | jq '.message'
               slog show /path/to/file.logarchive
 
+            Profiles:
+              slog profile create myapp --process MyApp --subsystem com.myapp --level debug
+              slog stream --profile myapp
+              slog stream --profile myapp --level error
+              slog profile list
+              slog profile show myapp
+              slog profile delete myapp
+
             Discovery:
               slog list processes --filter finder
               slog list simulators --booted
             """,
         version: "1.0.0",
-        subcommands: [StreamCommand.self, ShowCommand.self, ListCommand.self],
+        subcommands: [StreamCommand.self, ShowCommand.self, ListCommand.self, ProfileCommand.self],
         defaultSubcommand: StreamCommand.self
     )
 }
