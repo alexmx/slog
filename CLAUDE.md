@@ -16,7 +16,7 @@ swift test               # Run all tests
 swift package clean      # Clean build artifacts
 ```
 
-**AI agents:** Always use the **haiku model with a Bash subagent** when running `swift build` or `swift test` to minimize cost and latency.
+**AI agents:** Always use the **haiku model with a Bash subagent** when running `swift build`, `swift test`, `git commit`, or `git push` to minimize cost and latency.
 
 ## CLI Reference
 
