@@ -105,6 +105,18 @@ struct ProfileTests {
         #expect(profile.resolvedFormat == nil)
     }
 
+    @Test("resolvedTimeMode returns valid TimeMode")
+    func resolvedTimeMode() {
+        let profile = Profile(time: "relative")
+        #expect(profile.resolvedTimeMode == .relative)
+    }
+
+    @Test("resolvedTimeMode returns nil for invalid time")
+    func resolvedTimeModeInvalid() {
+        let profile = Profile(time: "invalid")
+        #expect(profile.resolvedTimeMode == nil)
+    }
+
     @Test("Nil fields are omitted from JSON")
     func nilFieldsOmitted() throws {
         let profile = Profile(process: "MyApp")

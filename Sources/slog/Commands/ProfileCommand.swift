@@ -108,6 +108,9 @@ struct CreateProfile: ParsableCommand {
     @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
     var format: OutputFormat?
 
+    @Option(name: .long, help: "Timestamp mode (absolute, relative)")
+    var time: TimeMode?
+
     @Flag(name: .long, help: "Include info-level messages")
     var info = false
 
@@ -134,6 +137,7 @@ struct CreateProfile: ParsableCommand {
             level: level?.rawValue.lowercased(),
             grep: grep,
             format: format?.rawValue,
+            time: time?.rawValue,
             info: info ? true : nil,
             debug: debug ? true : nil,
             source: source ? true : nil,

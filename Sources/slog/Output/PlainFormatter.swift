@@ -13,26 +13,27 @@ public struct PlainFormatter: LogFormatter {
     private let showLevel: Bool
     private let showProcess: Bool
     private let showSubsystem: Bool
+    private let timestampFormatter: TimestampFormatter
 
     public init(
         showTimestamp: Bool = true,
         showLevel: Bool = true,
         showProcess: Bool = true,
-        showSubsystem: Bool = true
+        showSubsystem: Bool = true,
+        timestampFormatter: TimestampFormatter = TimestampFormatter()
     ) {
         self.showTimestamp = showTimestamp
         self.showLevel = showLevel
         self.showProcess = showProcess
         self.showSubsystem = showSubsystem
+        self.timestampFormatter = timestampFormatter
     }
 
     public func format(_ entry: LogEntry) -> String {
         var components: [String] = []
 
         if showTimestamp {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "HH:mm:ss.SSS"
-            components.append(dateFormatter.string(from: entry.timestamp))
+            components.append(timestampFormatter.format(entry.timestamp))
         }
 
         if showLevel {

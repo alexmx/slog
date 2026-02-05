@@ -29,6 +29,9 @@ public struct Profile: Codable, Equatable, Sendable {
     /// Output format (plain, compact, color, json, toon)
     public var format: String?
 
+    /// Timestamp mode (absolute, relative)
+    public var time: String?
+
     /// Include info-level messages
     public var info: Bool?
 
@@ -52,6 +55,7 @@ public struct Profile: Codable, Equatable, Sendable {
         level: String? = nil,
         grep: String? = nil,
         format: String? = nil,
+        time: String? = nil,
         info: Bool? = nil,
         debug: Bool? = nil,
         source: Bool? = nil,
@@ -65,6 +69,7 @@ public struct Profile: Codable, Equatable, Sendable {
         self.level = level
         self.grep = grep
         self.format = format
+        self.time = time
         self.info = info
         self.debug = debug
         self.source = source
@@ -75,7 +80,7 @@ public struct Profile: Codable, Equatable, Sendable {
     /// Whether the profile has no fields set
     public var isEmpty: Bool {
         process == nil && pid == nil && subsystem == nil && category == nil &&
-        level == nil && grep == nil && format == nil && info == nil &&
+        level == nil && grep == nil && format == nil && time == nil && info == nil &&
         debug == nil && source == nil && simulator == nil && simulatorUDID == nil
     }
 
@@ -87,5 +92,10 @@ public struct Profile: Codable, Equatable, Sendable {
     /// Resolve the format string to an OutputFormat, if valid
     public var resolvedFormat: OutputFormat? {
         format.flatMap { OutputFormat(rawValue: $0) }
+    }
+
+    /// Resolve the time string to a TimeMode, if valid
+    public var resolvedTimeMode: TimeMode? {
+        time.flatMap { TimeMode(rawValue: $0) }
     }
 }

@@ -53,6 +53,9 @@ struct StreamCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
     var format: OutputFormat?
 
+    @Option(name: .long, help: "Timestamp mode (absolute, relative)")
+    var time: TimeMode?
+
     @Flag(name: .long, inversion: .prefixedNo, help: "Include info-level messages")
     var info: Bool?
 
@@ -108,9 +111,10 @@ struct StreamCommand: AsyncParsableCommand {
         let effectiveSource = source ?? prof?.source ?? false
         let effectiveSimulator = simulator || (prof?.simulator ?? false)
         let effectiveSimulatorUDID = simulatorUDID ?? prof?.simulatorUDID
+        let effectiveTime = time ?? prof?.resolvedTimeMode ?? .absolute
 
         // Determine output format
-        let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep)
+        let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep, timeMode: effectiveTime)
 
         // Build server-side predicate
         let predicate = PredicateBuilder.buildPredicate(

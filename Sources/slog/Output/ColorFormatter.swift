@@ -15,28 +15,29 @@ public struct ColorFormatter: LogFormatter {
     private let showProcess: Bool
     private let showSubsystem: Bool
     private let highlightPattern: String?
+    private let timestampFormatter: TimestampFormatter
 
     public init(
         showTimestamp: Bool = true,
         showLevel: Bool = true,
         showProcess: Bool = true,
         showSubsystem: Bool = true,
-        highlightPattern: String? = nil
+        highlightPattern: String? = nil,
+        timestampFormatter: TimestampFormatter = TimestampFormatter()
     ) {
         self.showTimestamp = showTimestamp
         self.showLevel = showLevel
         self.showProcess = showProcess
         self.showSubsystem = showSubsystem
         self.highlightPattern = highlightPattern
+        self.timestampFormatter = timestampFormatter
     }
 
     public func format(_ entry: LogEntry) -> String {
         var components: [String] = []
 
         if showTimestamp {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "HH:mm:ss.SSS"
-            let timestamp = dateFormatter.string(from: entry.timestamp)
+            let timestamp = timestampFormatter.format(entry.timestamp)
             components.append(timestamp.lightBlack)
         }
 
