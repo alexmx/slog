@@ -27,85 +27,85 @@ enum SlogTools {
     // MARK: - Argument Types
 
     struct ShowArgs: MCPToolInput {
-        @InputProperty("Time range: duration (e.g. 5m, 1h) or 'boot' for last boot")
+        @InputProperty("Time range: duration (e.g. '5m', '1h') or 'boot' for last boot. Start here for quick lookback.")
         var last: String?
 
-        @InputProperty("Start date (e.g. '2024-01-15 10:30:00')")
+        @InputProperty("Start date for custom range (e.g. '2024-01-15 10:30:00'). Use with 'end' instead of 'last'.")
         var start: String?
 
-        @InputProperty("End date (e.g. '2024-01-15 11:00:00')")
+        @InputProperty("End date for custom range (e.g. '2024-01-15 11:00:00'). Optional — omit to query from start to now.")
         var end: String?
 
-        @InputProperty("Filter by process name")
+        @InputProperty("Filter by process name (use slog_list_processes to discover names)")
         var process: String?
 
         @InputProperty("Filter by process ID")
         var pid: Int?
 
-        @InputProperty("Filter by subsystem (e.g. com.apple.network)")
+        @InputProperty("Filter by subsystem (e.g. 'com.apple.network'). Automatically includes debug logs.")
         var subsystem: String?
 
-        @InputProperty("Filter by category")
+        @InputProperty("Filter by category (use with subsystem for precise filtering)")
         var category: String?
 
-        @InputProperty("Minimum log level: debug, info, default, error, fault")
+        @InputProperty("Minimum log level: debug, info, default, error, fault. Narrows results when too many entries.")
         var level: String?
 
-        @InputProperty("Filter messages by regex pattern")
+        @InputProperty("Filter messages by regex pattern (client-side, applied after retrieval)")
         var grep: String?
 
-        @InputProperty("Exclude messages matching regex pattern")
+        @InputProperty("Exclude messages matching regex (e.g. 'heartbeat|keepalive' to remove noise)")
         var exclude_grep: String?
 
-        @InputProperty("Maximum number of entries to return")
+        @InputProperty("Maximum number of entries to return (default: 500)")
         var count: Int?
 
-        @InputProperty("Path to a .logarchive file")
+        @InputProperty("Path to a .logarchive file (alternative to last/start)")
         var archive_path: String?
     }
 
     struct StreamArgs: MCPToolInput {
-        @InputProperty("Filter by process name")
+        @InputProperty("Filter by process name (use slog_list_processes to discover names)")
         var process: String?
 
         @InputProperty("Filter by process ID")
         var pid: Int?
 
-        @InputProperty("Filter by subsystem (e.g. com.apple.network)")
+        @InputProperty("Filter by subsystem (e.g. 'com.apple.network'). Automatically includes debug logs.")
         var subsystem: String?
 
-        @InputProperty("Filter by category")
+        @InputProperty("Filter by category (use with subsystem for precise filtering)")
         var category: String?
 
-        @InputProperty("Minimum log level: debug, info, default, error, fault")
+        @InputProperty("Minimum log level: debug, info, default, error, fault. Narrows results when too many entries.")
         var level: String?
 
-        @InputProperty("Filter messages by regex pattern")
+        @InputProperty("Filter messages by regex pattern (client-side, applied after retrieval)")
         var grep: String?
 
-        @InputProperty("Exclude messages matching regex pattern")
+        @InputProperty("Exclude messages matching regex (e.g. 'heartbeat|keepalive' to remove noise)")
         var exclude_grep: String?
 
-        @InputProperty("Number of entries to capture (required, max 1000)")
+        @InputProperty("Number of entries to capture (required, max 1000). Controls how long the stream runs.")
         var count: Int
 
-        @InputProperty("Stream from iOS Simulator instead of host")
+        @InputProperty("Stream from iOS Simulator instead of host (use slog_list_simulators to find devices)")
         var simulator: Bool?
 
-        @InputProperty("Simulator UDID (auto-detects if only one booted)")
+        @InputProperty("Simulator UDID (auto-detects if only one booted). Use slog_list_simulators to find UDIDs.")
         var simulator_udid: String?
     }
 
     struct ListProcessesArgs: MCPToolInput {
-        @InputProperty("Filter processes by name (case-insensitive)")
+        @InputProperty("Filter processes by name (case-insensitive). Omit to list all running processes.")
         var filter: String?
     }
 
     struct ListSimulatorsArgs: MCPToolInput {
-        @InputProperty("Show only booted simulators")
+        @InputProperty("Show only booted simulators (recommended — these are the ones you can stream from)")
         var booted: Bool?
 
-        @InputProperty("Include unavailable simulators")
+        @InputProperty("Include unavailable simulators (runtimes not installed)")
         var all: Bool?
     }
 
@@ -114,10 +114,13 @@ enum SlogTools {
     static let show = MCPTool(
         name: "slog_show",
         description: """
-        Query historical/persisted macOS logs. Returns log entries as JSON array. \
+        Query historical/persisted macOS logs. **Use this for post-mortem analysis** — \
+        investigating what happened in the recent past. Returns log entries as JSON array. \
         Requires at least 'last', 'start', or 'archive_path'. \
         Use 'last' for recent logs (e.g. '5m', '1h', 'boot'). \
-        Use 'start'/'end' for date ranges.
+        Use 'start'/'end' for date ranges. \
+        **Start with broad filters** (process only), then narrow with subsystem/level/grep. \
+        When filtering by subsystem, debug logs are automatically included.
         """
     ) { (args: ShowArgs) in
         // Validate: need at least one time source
@@ -182,9 +185,13 @@ enum SlogTools {
     static let stream = MCPTool(
         name: "slog_stream",
         description: """
-        Stream live macOS/iOS logs with bounded capture. Returns log entries as JSON array. \
+        Stream live macOS/iOS logs with bounded capture. **Use this for real-time debugging** — \
+        watching logs as they happen. Returns log entries as JSON array. \
         The 'count' parameter is required (max 1000) to ensure bounded capture. \
-        Use filters to narrow results. Supports iOS Simulator via 'simulator' flag.
+        **For investigating past events, use slog_show instead.** \
+        Start with broad filters (process only), then narrow with subsystem/level/grep. \
+        Supports iOS Simulator via 'simulator' flag. \
+        When filtering by subsystem, debug logs are automatically included.
         """
     ) { (args: StreamArgs) in
         let count = min(args.count, 1000)
@@ -237,7 +244,7 @@ enum SlogTools {
 
     static let listProcesses = MCPTool(
         name: "slog_list_processes",
-        description: "List running macOS processes. Returns JSON array of {name, pid} objects."
+        description: "List running macOS processes. **Use this first** to discover process names for filtering with slog_show or slog_stream. Returns JSON array of {name, pid} objects."
     ) { (args: ListProcessesArgs) in
         let processes = try SystemQuery.listProcesses(filter: args.filter)
         return try json(processes)
@@ -245,7 +252,7 @@ enum SlogTools {
 
     static let listSimulators = MCPTool(
         name: "slog_list_simulators",
-        description: "List iOS Simulators. Returns JSON array of {name, udid, state, runtime} objects."
+        description: "List iOS Simulators. Use this to find simulator UDIDs for streaming logs with slog_stream's 'simulator' flag. Returns JSON array of {name, udid, state, runtime} objects."
     ) { (args: ListSimulatorsArgs) in
         let simulators = try SystemQuery.listSimulators(
             booted: args.booted ?? false,
@@ -256,7 +263,7 @@ enum SlogTools {
 
     static let doctor = MCPTool(
         name: "slog_doctor",
-        description: "Check system requirements for slog. Returns JSON object with check results."
+        description: "Check system requirements for slog. Run this if other tools fail unexpectedly — it verifies log CLI access, stream/archive access, simulator support, and profile directory. Returns JSON object with check results."
     ) {
         let checks = DoctorCheck.runAll()
         return try json(checks)
