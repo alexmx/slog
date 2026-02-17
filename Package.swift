@@ -26,6 +26,11 @@ let package = Package(
                 .product(name: "SwiftMCP", package: "swift-cli-mcp"),
             ]
         ),
+        .executableTarget(
+            name: "slog-test-emitter",
+            dependencies: [],
+            path: "Sources/TestEmitter"
+        ),
         .testTarget(
             name: "slogTests",
             dependencies: ["slog"]
