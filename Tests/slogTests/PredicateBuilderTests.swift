@@ -81,6 +81,15 @@ struct PredicateBuilderTests {
         #expect(predicate == "eventMessage CONTAINS \"say \\\"hello\\\"\"")
     }
 
+    @Test("Message contains escapes backslashes before quotes")
+    func messageContainsEscapesBackslashes() {
+        var builder = PredicateBuilder()
+        builder.messageContains("path\\to\\file")
+        let predicate = builder.build()
+
+        #expect(predicate == "eventMessage CONTAINS \"path\\\\to\\\\file\"")
+    }
+
     // MARK: - Combinations
 
     @Test("Multiple predicates joined with AND")

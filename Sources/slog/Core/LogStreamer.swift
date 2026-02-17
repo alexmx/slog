@@ -194,7 +194,9 @@ public struct PredicateBuilder: Sendable {
 
     /// Filter by message content (contains)
     public mutating func messageContains(_ text: String) {
-        let escaped = text.replacingOccurrences(of: "\"", with: "\\\"")
+        let escaped = text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
         components.append("eventMessage CONTAINS \"\(escaped)\"")
     }
 

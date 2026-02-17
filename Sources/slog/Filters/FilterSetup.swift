@@ -35,7 +35,7 @@ public struct FilterSetup: Sendable {
         excludeGrep: String? = nil,
         info: Bool = false,
         debug: Bool = false
-    ) -> FilterSetup {
+    ) throws -> FilterSetup {
         let predicate = PredicateBuilder.buildPredicate(
             process: process,
             pid: pid,
@@ -46,10 +46,10 @@ public struct FilterSetup: Sendable {
 
         var filterChain = FilterChain()
         if let grep {
-            filterChain.messageRegex(grep)
+            try filterChain.messageRegex(grep)
         }
         if let excludeGrep {
-            filterChain.excludeMessageRegex(excludeGrep)
+            try filterChain.excludeMessageRegex(excludeGrep)
         }
 
         let autoDebug = subsystem != nil && level == nil && !info && !debug

@@ -125,7 +125,7 @@ enum SlogTools {
             return .text("{\"error\": \"Specify 'last', 'start', or 'archive_path'\"}")
         }
 
-        let setup = FilterSetup.build(
+        let setup = try FilterSetup.build(
             process: args.process,
             pid: args.pid,
             subsystem: args.subsystem,
@@ -192,7 +192,7 @@ enum SlogTools {
             return .text("{\"error\": \"'count' must be a positive integer\"}")
         }
 
-        let setup = FilterSetup.build(
+        let setup = try FilterSetup.build(
             process: args.process,
             pid: args.pid,
             subsystem: args.subsystem,

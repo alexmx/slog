@@ -16,6 +16,7 @@ struct FormattedEntryTests {
         category: String? = "general",
         threadID: Int? = 100,
         activityID: Int? = 200,
+        traceID: Int? = 300,
         processImagePath: String? = "/usr/bin/TestApp",
         senderImagePath: String? = "/usr/lib/libSystem.dylib",
         eventType: String? = "logEvent",
@@ -31,6 +32,7 @@ struct FormattedEntryTests {
             message: "Something went wrong",
             threadID: threadID,
             activityID: activityID,
+            traceID: traceID,
             processImagePath: processImagePath,
             senderImagePath: senderImagePath,
             eventType: eventType,
@@ -52,6 +54,7 @@ struct FormattedEntryTests {
         #expect(formatted.category == "general")
         #expect(formatted.threadID == 100)
         #expect(formatted.activityID == 200)
+        #expect(formatted.traceID == 300)
         #expect(formatted.processImagePath == "/usr/bin/TestApp")
         #expect(formatted.senderImagePath == "/usr/lib/libSystem.dylib")
         #expect(formatted.eventType == "logEvent")
@@ -63,6 +66,7 @@ struct FormattedEntryTests {
         let entry = makeEntry(
             subsystem: nil, category: nil,
             threadID: nil, activityID: nil,
+            traceID: nil,
             processImagePath: nil, senderImagePath: nil,
             eventType: nil, source: nil
         )
@@ -72,6 +76,7 @@ struct FormattedEntryTests {
         #expect(formatted.category == nil)
         #expect(formatted.threadID == nil)
         #expect(formatted.activityID == nil)
+        #expect(formatted.traceID == nil)
         #expect(formatted.processImagePath == nil)
         #expect(formatted.senderImagePath == nil)
         #expect(formatted.eventType == nil)

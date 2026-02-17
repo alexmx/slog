@@ -134,21 +134,17 @@ public struct MessageContainsPredicate: LogPredicate {
 
 /// Matches entries where the message matches a regular expression
 public struct MessageRegexPredicate: LogPredicate {
-    private let pattern: String
-    private let regex: NSRegularExpression?
+    private let regex: NSRegularExpression
 
-    public init(pattern: String, caseSensitive: Bool = false) {
-        self.pattern = pattern
+    public init(pattern: String, caseSensitive: Bool = false) throws {
         var options: NSRegularExpression.Options = []
         if !caseSensitive {
             options.insert(.caseInsensitive)
         }
-        regex = try? NSRegularExpression(pattern: pattern, options: options)
+        regex = try NSRegularExpression(pattern: pattern, options: options)
     }
 
     public func matches(_ entry: LogEntry) -> Bool {
-        guard let regex else { return false }
-
         let range = NSRange(entry.message.startIndex..., in: entry.message)
         return regex.firstMatch(in: entry.message, options: [], range: range) != nil
     }

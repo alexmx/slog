@@ -62,15 +62,15 @@ public struct FilterChain: Sendable {
 
     /// Add a regex filter on the message
     @discardableResult
-    public mutating func messageRegex(_ pattern: String) -> FilterChain {
-        add(MessageRegexPredicate(pattern: pattern))
+    public mutating func messageRegex(_ pattern: String) throws -> FilterChain {
+        add(try MessageRegexPredicate(pattern: pattern))
         return self
     }
 
     /// Add an exclusion regex filter on the message (NOT match)
     @discardableResult
-    public mutating func excludeMessageRegex(_ pattern: String) -> FilterChain {
-        add(NotPredicate(MessageRegexPredicate(pattern: pattern)))
+    public mutating func excludeMessageRegex(_ pattern: String) throws -> FilterChain {
+        add(NotPredicate(try MessageRegexPredicate(pattern: pattern)))
         return self
     }
 

@@ -125,7 +125,7 @@ struct StreamCommand: AsyncParsableCommand {
         let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep, timeMode: effectiveTime)
 
         // Build predicate, filter chain, and log level inclusion
-        let setup = FilterSetup.build(
+        let setup = try FilterSetup.build(
             process: effectiveProcess,
             pid: effectivePid,
             subsystem: effectiveSubsystem,

@@ -19,6 +19,7 @@ public struct FormattedEntry: Encodable, Sendable {
     public let activityID: Int?
     public let processImagePath: String?
     public let senderImagePath: String?
+    public let traceID: Int?
     public let eventType: String?
     public let source: String?
 
@@ -32,6 +33,7 @@ public struct FormattedEntry: Encodable, Sendable {
         category = entry.category
         threadID = entry.threadID
         activityID = entry.activityID
+        traceID = entry.traceID
         processImagePath = entry.processImagePath
         senderImagePath = entry.senderImagePath
         eventType = entry.eventType

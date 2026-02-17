@@ -94,8 +94,8 @@ struct FilterPredicateTests {
     }
 
     @Test("MessageRegexPredicate matches pattern")
-    func messageRegexPredicate() {
-        let predicate = MessageRegexPredicate(pattern: "error.*timeout")
+    func messageRegexPredicate() throws {
+        let predicate = try MessageRegexPredicate(pattern: "error.*timeout")
 
         #expect(predicate.matches(makeEntry(message: "error: connection timeout")) == true)
         #expect(predicate.matches(makeEntry(message: "Error with timeout")) == true)

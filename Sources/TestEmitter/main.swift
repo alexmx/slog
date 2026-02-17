@@ -62,6 +62,8 @@ func emitTestLogs(batch: Int) {
     defaultLogger.log("\(prefix)Processing file: report_2026-Q1_final (v2).pdf")
 }
 
+let entriesPerBatch = 21
+
 // MARK: - CLI
 
 let args = CommandLine.arguments
@@ -99,7 +101,7 @@ if continuous {
     var batch = 1
     while true {
         emitTestLogs(batch: batch)
-        print("  Batch \(batch) emitted (\(21) log entries)")
+        print("  Batch \(batch) emitted (\(entriesPerBatch) log entries)")
         batch += 1
         Thread.sleep(forTimeInterval: 1.0)
     }
@@ -113,7 +115,7 @@ if continuous {
             }
         }
     }
-    print("Emitted \(21 * repeatCount) test log entries")
+    print("Emitted \(entriesPerBatch * repeatCount) test log entries")
     print("")
     print("Test with slog:")
     print("  slog show --last 10s --subsystem com.slog.test")

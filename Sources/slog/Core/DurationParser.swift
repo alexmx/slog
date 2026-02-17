@@ -12,11 +12,9 @@ enum DurationParser {
     /// A bare number without suffix is treated as seconds.
     static func parse(_ string: String, optionName: String) throws -> TimeInterval {
         let trimmed = string.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else {
+        guard let lastChar = trimmed.last else {
             throw ValidationError("\(optionName) cannot be empty")
         }
-
-        let lastChar = trimmed.last!
         let multiplier: Double
         let numberString: String
 

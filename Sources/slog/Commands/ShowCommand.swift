@@ -129,7 +129,7 @@ struct ShowCommand: AsyncParsableCommand {
         let dedupWriter = effectiveDedup ? DedupWriter(formatter: formatter) : nil
 
         // Build predicate, filter chain, and log level inclusion
-        let setup = FilterSetup.build(
+        let setup = try FilterSetup.build(
             process: effectiveProcess,
             pid: effectivePid,
             subsystem: effectiveSubsystem,
