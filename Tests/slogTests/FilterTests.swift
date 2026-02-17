@@ -174,7 +174,7 @@ struct FilterChainTests {
             makeEntry(level: .debug),
             makeEntry(level: .info),
             makeEntry(level: .error),
-            makeEntry(level: .fault),
+            makeEntry(level: .fault)
         ]
 
         let filtered = chain.filter(entries)
@@ -203,7 +203,7 @@ struct CompositePredicateTests {
     func allOfPredicate() {
         let predicate = AllOfPredicate(predicates: [
             MinimumLevelPredicate(minimumLevel: .error),
-            MessageContainsPredicate(substring: "critical"),
+            MessageContainsPredicate(substring: "critical")
         ])
 
         #expect(predicate.matches(makeEntry(level: .error, message: "critical error")) == true)
@@ -215,7 +215,7 @@ struct CompositePredicateTests {
     func anyOfPredicate() {
         let predicate = AnyOfPredicate(predicates: [
             ExactLevelPredicate(level: .error),
-            ExactLevelPredicate(level: .fault),
+            ExactLevelPredicate(level: .fault)
         ])
 
         #expect(predicate.matches(makeEntry(level: .error)) == true)

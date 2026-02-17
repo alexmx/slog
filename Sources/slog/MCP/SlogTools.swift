@@ -114,11 +114,11 @@ enum SlogTools {
     static let show = MCPTool(
         name: "slog_show",
         description: """
-            Query historical/persisted macOS logs. Returns log entries as JSON array. \
-            Requires at least 'last', 'start', or 'archive_path'. \
-            Use 'last' for recent logs (e.g. '5m', '1h', 'boot'). \
-            Use 'start'/'end' for date ranges.
-            """
+        Query historical/persisted macOS logs. Returns log entries as JSON array. \
+        Requires at least 'last', 'start', or 'archive_path'. \
+        Use 'last' for recent logs (e.g. '5m', '1h', 'boot'). \
+        Use 'start'/'end' for date ranges.
+        """
     ) { (args: ShowArgs) in
         // Validate: need at least one time source
         guard args.last != nil || args.start != nil || args.archive_path != nil else {
@@ -182,10 +182,10 @@ enum SlogTools {
     static let stream = MCPTool(
         name: "slog_stream",
         description: """
-            Stream live macOS/iOS logs with bounded capture. Returns log entries as JSON array. \
-            The 'count' parameter is required (max 1000) to ensure bounded capture. \
-            Use filters to narrow results. Supports iOS Simulator via 'simulator' flag.
-            """
+        Stream live macOS/iOS logs with bounded capture. Returns log entries as JSON array. \
+        The 'count' parameter is required (max 1000) to ensure bounded capture. \
+        Use filters to narrow results. Supports iOS Simulator via 'simulator' flag.
+        """
     ) { (args: StreamArgs) in
         let count = min(args.count, 1000)
         guard count > 0 else {
@@ -269,6 +269,6 @@ enum SlogTools {
         stream,
         listProcesses,
         listSimulators,
-        doctor,
+        doctor
     ]
 }

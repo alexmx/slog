@@ -32,7 +32,7 @@ public struct ToonFormatter: LogFormatter {
             "process: \(entry.processName)",
             "pid: \(entry.pid)",
             "level: \(entry.level.rawValue)",
-            "message: \(entry.message)",
+            "message: \(entry.message)"
         ]
 
         if let subsystem = entry.subsystem {

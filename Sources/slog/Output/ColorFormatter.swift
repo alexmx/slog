@@ -64,8 +64,7 @@ public struct ColorFormatter: LogFormatter {
 
         // Highlight pattern matches if specified
         if let pattern = highlightPattern,
-           let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
-        {
+           let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
             message = highlightMatches(in: message, regex: regex)
         }
 

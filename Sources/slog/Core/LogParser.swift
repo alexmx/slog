@@ -12,7 +12,7 @@ public struct LogParser: Sendable {
     private let decoder: JSONDecoder
 
     public init() {
-        decoder = JSONDecoder()
+        self.decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
@@ -143,8 +143,7 @@ public struct LogParser: Sendable {
                in: messageRemainder,
                range: NSRange(messageRemainder.startIndex..., in: messageRemainder)
            ),
-           let subsystemRange = Range(subsystemMatch.range(at: 1), in: messageRemainder)
-        {
+           let subsystemRange = Range(subsystemMatch.range(at: 1), in: messageRemainder) {
             subsystem = String(messageRemainder[subsystemRange])
             if let fullRange = Range(subsystemMatch.range, in: messageRemainder) {
                 messageRemainder = String(messageRemainder[fullRange.upperBound...])
@@ -160,8 +159,7 @@ public struct LogParser: Sendable {
                in: messageRemainder,
                range: NSRange(messageRemainder.startIndex..., in: messageRemainder)
            ),
-           let levelRange = Range(levelMatch.range(at: 1), in: messageRemainder)
-        {
+           let levelRange = Range(levelMatch.range(at: 1), in: messageRemainder) {
             let levelString = String(messageRemainder[levelRange])
             level = LogLevel(string: levelString) ?? .default
             if let fullRange = Range(levelMatch.range, in: messageRemainder) {

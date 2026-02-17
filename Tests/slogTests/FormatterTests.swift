@@ -82,14 +82,16 @@ struct PlainFormatterTests {
         #expect(output.contains("Hello world"))
     }
 
-    @Test("All log levels produce correct labels",
-          arguments: [
-              (LogLevel.debug, "DEBUG"),
-              (LogLevel.info, "INFO"),
-              (LogLevel.default, "DEFAULT"),
-              (LogLevel.error, "ERROR"),
-              (LogLevel.fault, "FAULT"),
-          ])
+    @Test(
+        "All log levels produce correct labels",
+        arguments: [
+            (LogLevel.debug, "DEBUG"),
+            (LogLevel.info, "INFO"),
+            (LogLevel.default, "DEFAULT"),
+            (LogLevel.error, "ERROR"),
+            (LogLevel.fault, "FAULT"),
+        ]
+    )
     func levelLabels(level: LogLevel, label: String) {
         let formatter = PlainFormatter()
         let output = formatter.format(makeEntry(level: level))
@@ -168,7 +170,7 @@ struct JSONFormatterTests {
         let formatter = JSONFormatter()
         let output = formatter.format(makeEntry())
 
-        let data = output.data(using: .utf8)!
+        let data = try #require(output.data(using: .utf8))
         let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
         #expect(parsed != nil)
@@ -185,7 +187,7 @@ struct JSONFormatterTests {
         let formatter = JSONFormatter()
         let output = formatter.format(makeEntry(subsystem: nil, category: nil))
 
-        let data = output.data(using: .utf8)!
+        let data = try #require(output.data(using: .utf8))
         let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
         #expect(parsed?["process"] as? String == "TestApp")
@@ -215,8 +217,8 @@ struct JSONFormatterTests {
         let output = formatter.format(makeEntry())
 
         // In sorted key output, "category" should come before "level"
-        let categoryIdx = output.range(of: "category")!.lowerBound
-        let levelIdx = output.range(of: "level")!.lowerBound
+        let categoryIdx = try #require(output.range(of: "category")?.lowerBound)
+        let levelIdx = try #require(output.range(of: "level")?.lowerBound)
         #expect(categoryIdx < levelIdx)
     }
 
@@ -225,25 +227,27 @@ struct JSONFormatterTests {
         let formatter = JSONFormatter()
         let output = formatter.format(makeEntry(message: "line1\nline2\ttab"))
 
-        let data = output.data(using: .utf8)!
+        let data = try #require(output.data(using: .utf8))
         let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
         #expect(parsed?["message"] as? String == "line1\nline2\ttab")
     }
 
-    @Test("All log levels produce correct level strings",
-          arguments: [
-              (LogLevel.debug, "Debug"),
-              (LogLevel.info, "Info"),
-              (LogLevel.default, "Default"),
-              (LogLevel.error, "Error"),
-              (LogLevel.fault, "Fault"),
-          ])
+    @Test(
+        "All log levels produce correct level strings",
+        arguments: [
+            (LogLevel.debug, "Debug"),
+            (LogLevel.info, "Info"),
+            (LogLevel.default, "Default"),
+            (LogLevel.error, "Error"),
+            (LogLevel.fault, "Fault")
+        ]
+    )
     func levelStrings(level: LogLevel, expected: String) throws {
         let formatter = JSONFormatter()
         let output = formatter.format(makeEntry(level: level))
 
-        let data = output.data(using: .utf8)!
+        let data = try #require(output.data(using: .utf8))
         let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
         #expect(parsed?["level"] as? String == expected)

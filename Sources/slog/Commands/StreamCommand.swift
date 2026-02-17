@@ -122,7 +122,11 @@ struct StreamCommand: AsyncParsableCommand {
         let effectiveDedup = dedup ?? prof?.dedup ?? false
 
         // Determine output format
-        let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep, timeMode: effectiveTime)
+        let formatter = FormatterRegistry.formatter(
+            for: effectiveFormat,
+            highlightPattern: effectiveGrep,
+            timeMode: effectiveTime
+        )
 
         // Build predicate, filter chain, and log level inclusion
         let setup = try FilterSetup.build(
@@ -300,7 +304,6 @@ struct StreamCommand: AsyncParsableCommand {
             return 0
         }
     }
-
 }
 
 // MARK: - Stream State

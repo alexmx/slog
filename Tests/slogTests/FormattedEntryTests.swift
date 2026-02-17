@@ -92,7 +92,7 @@ struct FormattedEntryTests {
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(formatted)
-        let json = String(data: data, encoding: .utf8)!
+        let json = try #require(String(data: data, encoding: .utf8))
 
         #expect(json.contains("\"process\":\"TestApp\""))
         #expect(json.contains("\"pid\":1234"))
@@ -114,7 +114,7 @@ struct FormattedEntryTests {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(formatted)
-        let json = String(data: data, encoding: .utf8)!
+        let json = try #require(String(data: data, encoding: .utf8))
 
         // null fields should still appear as null in JSON (default Encodable behavior)
         #expect(json.contains("\"process\":\"TestApp\""))
@@ -128,7 +128,7 @@ struct FormattedEntryTests {
             (.info, "Info"),
             (.default, "Default"),
             (.error, "Error"),
-            (.fault, "Fault"),
+            (.fault, "Fault")
         ]
 
         for (level, expected) in levels {

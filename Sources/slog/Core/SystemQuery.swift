@@ -142,8 +142,7 @@ public enum SystemQuery {
         for (_, deviceList) in devices {
             for device in deviceList {
                 if let state = device["state"] as? String, state == "Booted",
-                   let udid = device["udid"] as? String
-                {
+                   let udid = device["udid"] as? String {
                     return udid
                 }
             }

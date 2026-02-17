@@ -12,8 +12,7 @@ enum XDGDirectories {
     /// Uses `$XDG_CONFIG_HOME` if set and absolute, otherwise `~/.config`.
     static var configHome: URL {
         if let xdg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"],
-           xdg.hasPrefix("/")
-        {
+           xdg.hasPrefix("/") {
             return URL(fileURLWithPath: xdg)
         }
         return FileManager.default.homeDirectoryForCurrentUser

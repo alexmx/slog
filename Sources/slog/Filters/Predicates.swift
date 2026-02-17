@@ -141,7 +141,7 @@ public struct MessageRegexPredicate: LogPredicate {
         if !caseSensitive {
             options.insert(.caseInsensitive)
         }
-        regex = try NSRegularExpression(pattern: pattern, options: options)
+        self.regex = try NSRegularExpression(pattern: pattern, options: options)
     }
 
     public func matches(_ entry: LogEntry) -> Bool {

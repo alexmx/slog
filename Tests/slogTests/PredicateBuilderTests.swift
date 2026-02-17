@@ -47,14 +47,16 @@ struct PredicateBuilderTests {
         #expect(predicate == "category == \"http\"")
     }
 
-    @Test("Level predicate uses messageType with correct values",
-          arguments: [
-              (LogLevel.debug, 0),
-              (LogLevel.info, 1),
-              (LogLevel.default, 2),
-              (LogLevel.error, 16),
-              (LogLevel.fault, 17),
-          ])
+    @Test(
+        "Level predicate uses messageType with correct values",
+        arguments: [
+            (LogLevel.debug, 0),
+            (LogLevel.info, 1),
+            (LogLevel.default, 2),
+            (LogLevel.error, 16),
+            (LogLevel.fault, 17),
+        ]
+    )
     func levelFilter(level: LogLevel, value: Int) {
         var builder = PredicateBuilder()
         builder.level(level)
@@ -115,7 +117,7 @@ struct PredicateBuilderTests {
     // MARK: - Static Helper
 
     @Test("buildPredicate with all parameters")
-    func buildPredicateAllParams() {
+    func buildPredicateAllParams() throws {
         let predicate = PredicateBuilder.buildPredicate(
             process: "MyApp",
             pid: 42,
@@ -125,11 +127,11 @@ struct PredicateBuilderTests {
         )
 
         #expect(predicate != nil)
-        #expect(predicate!.contains("processImagePath ENDSWITH \"/MyApp\""))
-        #expect(predicate!.contains("processID == 42"))
-        #expect(predicate!.contains("subsystem == \"com.my.app\""))
-        #expect(predicate!.contains("category == \"net\""))
-        #expect(predicate!.contains("messageType >= 16"))
+        #expect(try #require(predicate?.contains("processImagePath ENDSWITH \"/MyApp\"")))
+        #expect(try #require(predicate?.contains("processID == 42")))
+        #expect(try #require(predicate?.contains("subsystem == \"com.my.app\"")))
+        #expect(try #require(predicate?.contains("category == \"net\"")))
+        #expect(try #require(predicate?.contains("messageType >= 16")))
     }
 
     @Test("buildPredicate with no parameters returns nil")

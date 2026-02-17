@@ -22,7 +22,7 @@ public final class TimestampFormatter: @unchecked Sendable {
 
     public init(mode: TimeMode = .absolute) {
         self.mode = mode
-        dateFormatter = DateFormatter()
+        self.dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "HH:mm:ss.SSS"
     }
 

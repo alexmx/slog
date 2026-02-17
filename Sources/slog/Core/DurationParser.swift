@@ -34,7 +34,9 @@ enum DurationParser {
         }
 
         guard let value = Double(numberString), value > 0 else {
-            throw ValidationError("\(optionName) must be a positive number with optional suffix (s, m, h). Got: \(string)")
+            throw ValidationError(
+                "\(optionName) must be a positive number with optional suffix (s, m, h). Got: \(string)"
+            )
         }
 
         return value * multiplier

@@ -34,7 +34,7 @@ struct MCPCommand: AsyncParsableCommand {
     private func printSetup() {
         print("""
         Add slog as an MCP server to your AI coding agent:
-
+        
           Claude Code:          claude mcp add --transport stdio slog -- slog mcp
           Codex CLI:            codex mcp add slog -- slog mcp
           VS Code / Copilot:    code --add-mcp '{"name":"slog","command":"slog","args":["mcp"]}'

@@ -98,7 +98,9 @@ struct LogParserTests {
 
         for (levelStr, expectedLevel) in zip(levels, expectedLevels) {
             let json = """
-            {"timestamp":"2024-01-15T10:30:45Z","processImagePath":"/bin/test","processID":1,"messageType":"\(levelStr)","eventMessage":"Test"}
+            {"timestamp":"2024-01-15T10:30:45Z","processImagePath":"/bin/test","processID":1,"messageType":"\(
+                levelStr
+            )","eventMessage":"Test"}
             """
 
             let entry = parser.parse(line: json)

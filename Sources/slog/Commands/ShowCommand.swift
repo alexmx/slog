@@ -125,7 +125,11 @@ struct ShowCommand: AsyncParsableCommand {
         let effectiveTime = time ?? prof?.resolvedTimeMode ?? .absolute
         let effectiveDedup = dedup ?? prof?.dedup ?? false
 
-        let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep, timeMode: effectiveTime)
+        let formatter = FormatterRegistry.formatter(
+            for: effectiveFormat,
+            highlightPattern: effectiveGrep,
+            timeMode: effectiveTime
+        )
         let dedupWriter = effectiveDedup ? DedupWriter(formatter: formatter) : nil
 
         // Build predicate, filter chain, and log level inclusion

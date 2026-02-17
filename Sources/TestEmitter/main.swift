@@ -1,14 +1,14 @@
-///
-/// slog-test-emitter
-///
-/// Emits a known set of log entries via Apple's unified logging system.
-/// Use this to test slog commands and filters against predictable output.
-///
-/// Usage:
-///   swift run slog-test-emitter              # Emit all test logs once
-///   swift run slog-test-emitter --repeat 5   # Repeat 5 times (1s interval)
-///   swift run slog-test-emitter --continuous  # Emit every second until interrupted
-///
+//
+// slog-test-emitter
+//
+// Emits a known set of log entries via Apple's unified logging system.
+// Use this to test slog commands and filters against predictable output.
+//
+// Usage:
+//   swift run slog-test-emitter              # Emit all test logs once
+//   swift run slog-test-emitter --repeat 5   # Repeat 5 times (1s interval)
+//   swift run slog-test-emitter --continuous  # Emit every second until interrupted
+//
 
 import Foundation
 import os
@@ -71,17 +71,17 @@ let args = CommandLine.arguments
 if args.contains("--help") || args.contains("-h") {
     print("""
     slog-test-emitter - Emit test logs for slog testing
-
+    
     Usage:
       slog-test-emitter                 Emit all test logs once
       slog-test-emitter --repeat N      Repeat N times (1s interval)
       slog-test-emitter --continuous    Emit every second until Ctrl+C
-
+    
     Subsystems emitted:
       com.slog.test              (categories: general, auth, performance)
       com.slog.test.network      (category: http)
       com.slog.test.database     (category: query)
-
+    
     Log levels emitted: debug, info, default, error, fault
     """)
     exit(0)
@@ -91,8 +91,7 @@ let continuous = args.contains("--continuous")
 var repeatCount = 1
 
 if let idx = args.firstIndex(of: "--repeat"), idx + 1 < args.count,
-   let count = Int(args[idx + 1])
-{
+   let count = Int(args[idx + 1]) {
     repeatCount = count
 }
 
@@ -106,7 +105,7 @@ if continuous {
         Thread.sleep(forTimeInterval: 1.0)
     }
 } else {
-    for i in 0 ..< repeatCount {
+    for i in 0..<repeatCount {
         emitTestLogs(batch: repeatCount > 1 ? i + 1 : 0)
         if repeatCount > 1 {
             print("  Batch \(i + 1) emitted")

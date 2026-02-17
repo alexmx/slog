@@ -24,19 +24,19 @@ public struct FormattedEntry: Encodable, Sendable {
     public let source: String?
 
     public init(from entry: LogEntry) {
-        timestamp = entry.timestamp
-        process = entry.processName
-        pid = entry.pid
-        level = entry.level.rawValue
-        message = entry.message
-        subsystem = entry.subsystem
-        category = entry.category
-        threadID = entry.threadID
-        activityID = entry.activityID
-        traceID = entry.traceID
-        processImagePath = entry.processImagePath
-        senderImagePath = entry.senderImagePath
-        eventType = entry.eventType
-        source = entry.source
+        self.timestamp = entry.timestamp
+        self.process = entry.processName
+        self.pid = entry.pid
+        self.level = entry.level.rawValue
+        self.message = entry.message
+        self.subsystem = entry.subsystem
+        self.category = entry.category
+        self.threadID = entry.threadID
+        self.activityID = entry.activityID
+        self.traceID = entry.traceID
+        self.processImagePath = entry.processImagePath
+        self.senderImagePath = entry.senderImagePath
+        self.eventType = entry.eventType
+        self.source = entry.source
     }
 }

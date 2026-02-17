@@ -15,7 +15,7 @@ struct ProfileCommand: ParsableCommand {
             ListProfiles.self,
             ShowProfile.self,
             CreateProfile.self,
-            DeleteProfile.self,
+            DeleteProfile.self
         ]
     )
 }

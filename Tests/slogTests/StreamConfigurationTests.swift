@@ -137,7 +137,7 @@ struct LogStreamerCommandTests {
     }
 
     @Test("Simulator target preserves flags after log command")
-    func simulatorPreservesFlags() {
+    func simulatorPreservesFlags() throws {
         let config = StreamConfiguration(
             target: .simulator(udid: "U"),
             predicate: "subsystem == \"test\"",
@@ -148,7 +148,7 @@ struct LogStreamerCommandTests {
         let (_, args) = streamer.buildCommand(for: config)
 
         // After "simctl", "spawn", "U", "log", the stream args should follow
-        let logIndex = args.firstIndex(of: "log")!
+        let logIndex = try #require(args.firstIndex(of: "log"))
         let afterLog = Array(args[(logIndex + 1)...])
 
         #expect(afterLog.contains("stream"))
