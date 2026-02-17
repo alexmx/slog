@@ -1,267 +1,156 @@
-# AI Agent Guidelines
+# slog
 
-This file provides guidance to AI agents when working with code in this repository.
+## What is slog?
 
-## Project Overview
+slog is a Swift CLI tool and MCP server for intercepting and filtering macOS/iOS logs. It wraps Apple's `log` CLI to provide enhanced filtering, formatting, iOS Simulator support, and time-bounded capture for automation workflows.
 
-slog is a Swift CLI tool for intercepting and filtering macOS/iOS logs. It wraps Apple's `log` CLI to provide enhanced filtering, formatting, and iOS Simulator support.
+## Project Structure
 
-## Build Commands
+```
+slog/
+├── Package.swift                       # SPM manifest (macOS 26+, Swift 6.2)
+├── Sources/slog/
+│   ├── Commands/                       # One file per CLI command (ArgumentParser)
+│   │   ├── RootCommand.swift           # @main entry point with 6 subcommands
+│   │   ├── StreamCommand.swift         # Live log streaming with filters
+│   │   ├── ShowCommand.swift           # Historical log queries
+│   │   ├── ProfileCommand.swift        # Profile management (create/list/show/delete)
+│   │   ├── ListCommand.swift           # List processes/simulators
+│   │   ├── DoctorCommand.swift         # System requirements checker
+│   │   └── MCPCommand.swift            # MCP server for AI tool integration
+│   ├── Core/                           # Log handling and shared services
+│   │   ├── LogEntry.swift              # LogEntry struct, LogLevel enum
+│   │   ├── LogParser.swift             # NDJSON and legacy format parser
+│   │   ├── LogStreamer.swift           # Stream process management, PredicateBuilder
+│   │   ├── LogReader.swift             # Historical log reading via `log show`
+│   │   ├── DurationParser.swift        # Duration string parsing (e.g., "5s", "2m")
+│   │   ├── SystemQuery.swift           # Process/simulator listing, UDID resolution
+│   │   ├── DoctorCheck.swift           # System requirement checks
+│   │   └── Version.swift               # Version constant (overridden by CI)
+│   ├── Config/                         # Configuration and profiles
+│   │   ├── XDGDirectories.swift        # XDG-compliant path resolution
+│   │   ├── Profile.swift               # Profile data model (Codable)
+│   │   └── ProfileManager.swift        # Profile CRUD operations
+│   ├── Filters/                        # Filtering system
+│   │   ├── FilterChain.swift           # Thread-safe filter chain with DSL
+│   │   ├── FilterSetup.swift           # Predicate + filter chain + auto-debug builder
+│   │   └── Predicates.swift            # 10+ composable predicate types
+│   ├── MCP/
+│   │   └── SlogTools.swift             # 5 MCP tool definitions reusing core logic
+│   └── Output/                         # Formatters
+│       ├── Formatter.swift             # Protocol, registry, OutputFormat enum
+│       ├── FormattedEntry.swift        # Shared Encodable model for JSON/TOON
+│       ├── PlainFormatter.swift        # Plain text output
+│       ├── ColorFormatter.swift        # ANSI-colored output
+│       ├── JSONFormatter.swift         # JSON output
+│       ├── ToonFormatter.swift         # TOON output (token-optimized)
+│       └── DedupWriter.swift           # Consecutive message deduplication
+├── Sources/TestEmitter/
+│   └── main.swift                      # Test log emitter for end-to-end testing
+└── Tests/slogTests/                    # Apple Testing framework tests
+```
+
+## Build & Run
 
 ```bash
-swift build              # Debug build
-swift build -c release   # Release build
-swift run slog [args]    # Run the tool
-swift test               # Run all tests
-swift package clean      # Clean build artifacts
+swift build                     # Debug build
+swift build -c release          # Release build
+swift run slog [args]           # Run the tool
+swift test                      # Run all tests
 ```
 
 **AI agents:** Always use the **haiku model with a Bash subagent** when running `swift build`, `swift test`, `git commit`, or `git push` to minimize cost and latency.
 
-## CLI Reference
+**Requirements:** macOS 26+, Swift 6.2, Xcode toolchain.
 
-### Stream Command (default)
+**Dependencies:**
+- `swift-argument-parser` — CLI argument parsing
+- `swift-subprocess` — Modern async process execution
+- `Rainbow` — ANSI color support for terminal output
+- `ToonFormat` — TOON (Token-Oriented Object Notation) encoding
+- `SwiftMCP` (`swift-cli-mcp`) — MCP server framework
 
-Stream logs from macOS or iOS Simulator.
+## Version Management & Releases
 
-**Target Options:**
-- `--process <name>` - Filter by process name
-- `--pid <id>` - Filter by process ID
-- `--simulator` - Stream from iOS Simulator instead of host
-- `--simulator-udid <udid>` - Simulator UDID (auto-detects if one booted)
+**Version Source:** `.slog-version` file in repository root
 
-**Filter Options:**
-- `--subsystem <name>` - Filter by subsystem (e.g., com.apple.network)
-- `--category <name>` - Filter by category
-- `--level <level>` - Minimum log level: debug, info, default, error, fault
-- `--grep <pattern>` - Filter messages by regex pattern
-- `--exclude-grep <pattern>` - Exclude messages matching regex pattern
+- Single source of truth for version number (e.g., `0.1.0` or `dev`)
+- `Sources/slog/Version.swift` defines `slogVersion` constant (defaults to "dev" for local builds)
+- GitHub Actions reads `.slog-version`, generates `Version.swift` with actual version, then builds release binary
+- CLI exposes version via `slog --version`
 
-**Output Options:**
-- `--format <fmt>` - Output format: plain, compact, color (default), json, toon
-- `--time <mode>` - Timestamp mode: absolute (default), relative
-- `--info` / `--no-info` - Include info-level messages
-- `--debug` / `--no-debug` - Include debug-level messages
-- `--source` / `--no-source` - Include source location info
-- `--dedup` / `--no-dedup` - Collapse consecutive identical messages
+**Release Process:**
 
-**Timing Options (for bounded capture):**
-- `--timeout <duration>` - Max wait for first log (exits with code 1 if exceeded)
-- `--capture <duration>` - Capture duration after first log arrives
-- `--count <n>` - Number of entries to capture
+1. Update `.slog-version` with new version (e.g., `0.1.0`)
+2. Commit and push to main
+3. Manually trigger "Release" workflow from GitHub Actions
+4. Workflow creates git tag, builds universal binary, publishes GitHub release
+5. Automatically updates Homebrew formula in `homebrew-tools` repository with new SHA256
 
-Duration format: `5s`, `30s`, `2m`, `1h` (seconds assumed if no suffix)
+**Homebrew Distribution:**
 
-### Show Command
-
-Query historical/persisted logs from the macOS log archive.
-
-**Time Range Options:**
-- `--last <duration|boot>` - Show logs from last duration (e.g., 5m, 1h) or boot
-- `--start <date>` - Start date (e.g., "2024-01-15 10:30:00")
-- `--end <date>` - End date (e.g., "2024-01-15 11:00:00")
-
-**Filter Options:**
-- `--process <name>` - Filter by process name
-- `--pid <id>` - Filter by process ID
-- `--subsystem <name>` - Filter by subsystem (e.g., com.apple.network)
-- `--category <name>` - Filter by category
-- `--level <level>` - Minimum log level: debug, info, default, error, fault
-- `--grep <pattern>` - Filter messages by regex pattern
-- `--exclude-grep <pattern>` - Exclude messages matching regex pattern
-
-**Output Options:**
-- `--format <fmt>` - Output format: plain, compact, color (default), json, toon
-- `--time <mode>` - Timestamp mode: absolute (default), relative
-- `--info` / `--no-info` - Include info-level messages
-- `--debug` / `--no-debug` - Include debug-level messages
-- `--source` / `--no-source` - Include source location info
-- `--dedup` / `--no-dedup` - Collapse consecutive identical messages
-- `--count <n>` - Maximum number of entries to display
-
-**Archive:**
-- `[archive-path]` - Optional path to a .logarchive file
-
-Requires at least `--last`, `--start`, or an archive path. `--last` and `--start`/`--end` are mutually exclusive.
-
-### Profile Command
-
-Manage saved filter/format profiles. Profiles are stored as JSON in `$XDG_CONFIG_HOME/slog/profiles/` (defaults to `~/.config/slog/profiles/`).
-
-- `profile create <name> [options]` - Create a profile from CLI flags (`--force` to overwrite)
-- `profile list` - List available profiles
-- `profile show <name>` - Show profile contents
-- `profile delete <name>` - Delete a profile
-
-Both `stream` and `show` accept `--profile <name>` to load a saved profile. CLI args override profile values. Use `--no-info`, `--no-debug`, `--no-source` to explicitly disable profile flags.
-
-### List Command
-
-- `list processes [--filter <name>]` - List running processes
-- `list simulators [--booted] [--all]` - List iOS Simulators
-
-### Doctor Command
-
-Check system requirements and diagnose issues.
-
+Users install via:
 ```bash
-slog doctor
+brew tap alexmx/tools
+brew install slog
 ```
 
-Checks: log CLI, stream access, log archive access, simulator support, profiles directory.
+Formula location: `alexmx/homebrew-tools/Formula/slog.rb`
 
-### MCP Command
+## Commands
 
-Start an MCP (Model Context Protocol) server for AI tool integration.
+Six subcommands. `stream` is the default (can be omitted).
 
-```bash
-slog mcp            # Start MCP server (stdio transport)
-slog mcp --setup    # Print integration instructions
-```
+### Streaming & Querying
+- **stream** — Stream live logs. Filters: `--process`, `--subsystem`, `--category`, `--level`, `--grep`, `--exclude-grep`. Output: `--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`. Bounded capture: `--timeout`, `--capture`, `--count`.
+- **show** — Query historical logs. Requires `--last`, `--start`, or archive path. Same filters and output options as stream.
 
-Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`.
+### Configuration
+- **profile** — CRUD for saved filter/format profiles. `create`, `list`, `show`, `delete`. Use `--profile <name>` on stream/show.
 
-### Examples
+### Discovery
+- **list** — `list processes [--filter]`, `list simulators [--booted] [--all]`.
 
-```bash
-# Basic streaming
-slog stream --process Finder
-slog stream --process MyApp --level error
-slog stream --subsystem com.myapp.network
-
-# iOS Simulator
-slog stream --simulator --process MyApp
-
-# Bounded capture (for scripts/automation)
-slog stream --process MyApp --count 10
-slog stream --process MyApp --timeout 30s --capture 10s
-
-# Output formats
-slog stream --process MyApp --format compact
-slog stream --process MyApp --format json | jq '.message'
-
-# Historical logs
-slog show --last 5m
-slog show --last 1h --process Finder
-slog show --last 30s --level error
-slog show --last boot --subsystem com.apple.network
-slog show --start "2024-01-15 10:00:00" --end "2024-01-15 11:00:00"
-slog show --last 5m --format json | jq '.message'
-slog show /path/to/file.logarchive
-
-# Filtering
-slog stream --process MyApp --grep "error|fail"
-slog stream --process MyApp --exclude-grep heartbeat
-slog show --last 5m --grep "api.*users" --exclude-grep health
-
-# Dedup & source
-slog stream --process MyApp --dedup
-slog stream --process MyApp --source
-
-# Doctor & MCP
-slog doctor
-slog mcp --setup
-
-# Profiles
-slog profile create myapp --process MyApp --subsystem com.myapp --level debug --format compact
-slog stream --profile myapp
-slog stream --profile myapp --level error --format json
-slog profile list
-slog profile show myapp
-slog profile delete myapp
-```
-
-### Exit Codes
-
-- 0: Capture complete or user interrupt
-- 1: Timeout (no logs within --timeout) or stream error
-
-## Architecture
-
-```
-Sources/slog/
-├── Commands/           # CLI commands using ArgumentParser
-│   ├── RootCommand.swift    # @main entry point with 6 subcommands
-│   ├── StreamCommand.swift  # Main log streaming with filters
-│   ├── ShowCommand.swift    # Historical log queries
-│   ├── ProfileCommand.swift # Profile management (create/list/show/delete)
-│   ├── ListCommand.swift    # List processes/simulators
-│   ├── DoctorCommand.swift  # System requirements checker
-│   └── MCPCommand.swift     # MCP server for AI tool integration
-├── Core/               # Log handling
-│   ├── LogEntry.swift       # LogEntry struct, LogLevel enum
-│   ├── LogParser.swift      # NDJSON and legacy format parser
-│   ├── LogStreamer.swift    # Stream process management, PredicateBuilder
-│   ├── LogReader.swift      # Historical log reading via `log show`
-│   ├── DurationParser.swift # Duration string parsing (e.g., "5s", "2m")
-│   └── Version.swift        # Version constant (overridden by CI)
-├── Config/             # Configuration and profiles
-│   ├── XDGDirectories.swift # XDG-compliant path resolution
-│   ├── Profile.swift        # Profile data model (Codable)
-│   └── ProfileManager.swift # Profile CRUD operations
-├── Filters/            # Filtering system
-│   ├── FilterChain.swift    # Thread-safe filter chain with DSL
-│   └── Predicates.swift     # 10+ predicate types (composable)
-├── MCP/                # MCP server tools
-│   └── SlogTools.swift      # 5 MCP tool definitions reusing core logic
-└── Output/             # Formatters
-    ├── Formatter.swift      # Protocol, registry, OutputFormat enum
-    └── *Formatter.swift     # Plain, Color, JSON, Toon implementations
-
-Sources/TestEmitter/    # Test log emitter for end-to-end testing
-└── main.swift               # Emits known logs across 5 subsystems/levels
-```
-
-**Key patterns:**
-- Protocol-based extensibility (LogFormatter, LogPredicate)
-- Builder pattern for predicates and filter chains
-- Modern Swift Concurrency (async/await, actors, Sendable types)
-- swift-subprocess for async process execution
-
-## Log Levels
-
-Ordered from most to least verbose: debug (0), info (1), default (2), error (16), fault (17)
-
-**Auto-debug behavior:** When filtering by `--subsystem`, debug logs are automatically included. Override with explicit `--level` flag.
-
-## Output Formats
-
-- `plain` - Full details: timestamp, level, process, subsystem, message
-- `compact` - Minimal: timestamp, level, message only
-- `color` - Same as plain with ANSI colors based on log level (default)
-- `json` - JSON output for piping to other tools
-- `toon` - TOON output (token-optimized for LLMs)
+### System
+- **doctor** — Check system requirements (log CLI, stream/archive access, simctl, profiles dir).
+- **mcp** — Start MCP server. `--setup` for integration instructions.
 
 ## Testing
 
-Uses Apple's Testing framework (not XCTest):
-- `@Suite` for test groups, `@Test` for tests, `#expect()` for assertions
-- Tests in `Tests/slogTests/`
+Uses Apple's Testing framework (`@Suite`, `@Test`, `#expect()`, `#require()`).
 
 ```bash
 swift test                    # Run all tests
 swift test --filter <name>    # Run specific test
 ```
 
-### Test Emitter
-
-A separate executable that emits known log entries for end-to-end testing:
-
+**Test emitter** — separate executable for end-to-end testing:
 ```bash
 swift run slog-test-emitter              # Emit all test logs once
-swift run slog-test-emitter --repeat 5   # Repeat 5 times (1s interval)
-swift run slog-test-emitter --continuous  # Emit every second until interrupted
+swift run slog-test-emitter --repeat 5   # Repeat 5 times
+swift run slog-test-emitter --continuous  # Emit every second until Ctrl+C
 ```
 
-Emits 21 entries per batch across subsystems (`com.slog.test`, `com.slog.test.network`, `com.slog.test.database`) and all 5 log levels.
+## Adding a New Command
 
-## Dependencies
+1. Create `Sources/slog/Commands/NewCommand.swift` implementing `AsyncParsableCommand`
+2. Register it as a subcommand in `RootCommand.swift`
+3. Put shared business logic in `Core/` (e.g., a new service struct/enum)
+4. Add the corresponding MCP tool in `MCP/SlogTools.swift`
+5. Add tests in `Tests/slogTests/`
 
-- `swift-argument-parser` - CLI parsing and command structure
-- `swift-subprocess` - Modern async process execution
-- `Rainbow` - ANSI color support for terminal output
-- `ToonFormat` - TOON (Token-Oriented Object Notation) encoding
-- `SwiftMCP` (`swift-cli-mcp`) - MCP server framework for AI tool integration
+## Swift Style
+
+- Swift 6.2 with modern concurrency (async/await, Sendable types)
+- Protocol-based extensibility (LogFormatter, LogPredicate)
+- Builder pattern for predicates and filter chains
+- Shared services called by both CLI commands and MCP tools (thin wrappers)
+
+## Formatting
+
+```bash
+swiftformat .
+```
 
 ## Git Commits
 
