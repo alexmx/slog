@@ -125,7 +125,7 @@ struct Slog: AsyncParsableCommand {
           slog list simulators --booted
         """,
         version: slogVersion,
-        subcommands: [StreamCommand.self, ShowCommand.self, ListCommand.self, ProfileCommand.self, DoctorCommand.self],
+        subcommands: [StreamCommand.self, ShowCommand.self, ListCommand.self, ProfileCommand.self, DoctorCommand.self, MCPCommand.self],
         defaultSubcommand: StreamCommand.self
     )
 }
