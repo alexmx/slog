@@ -128,23 +128,18 @@ struct ShowCommand: AsyncParsableCommand {
         let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep, timeMode: effectiveTime)
         let dedupWriter = effectiveDedup ? DedupWriter(formatter: formatter) : nil
 
-        // Build server-side predicate
-        let predicate = PredicateBuilder.buildPredicate(
+        // Build predicate, filter chain, and log level inclusion
+        let setup = FilterSetup.build(
             process: effectiveProcess,
             pid: effectivePid,
             subsystem: effectiveSubsystem,
             category: effectiveCategory,
-            level: effectiveLevel
+            level: effectiveLevel,
+            grep: effectiveGrep,
+            excludeGrep: effectiveExcludeGrep,
+            info: effectiveInfo,
+            debug: effectiveDebug
         )
-
-        // Build client-side filter chain for regex
-        var filterChain = FilterChain()
-        if let grepPattern = effectiveGrep {
-            filterChain.messageRegex(grepPattern)
-        }
-        if let excludePattern = effectiveExcludeGrep {
-            filterChain.excludeMessageRegex(excludePattern)
-        }
 
         // Determine time range
         let timeRange: ShowConfiguration.TimeRange? = if let last {
@@ -163,18 +158,13 @@ struct ShowCommand: AsyncParsableCommand {
             nil
         }
 
-        // Determine log level inclusion
-        let autoDebug = effectiveSubsystem != nil && effectiveLevel == nil && !effectiveInfo && !effectiveDebug
-        let includeDebugLogs = effectiveDebug || autoDebug
-        let includeInfoLogs = effectiveInfo || includeDebugLogs
-
         // Create configuration
         let config = ShowConfiguration(
             timeRange: timeRange,
             archivePath: archivePath,
-            predicate: predicate,
-            includeInfo: includeInfoLogs,
-            includeDebug: includeDebugLogs,
+            predicate: setup.predicate,
+            includeInfo: setup.includeInfo,
+            includeDebug: setup.includeDebug,
             includeSource: effectiveSource
         )
 
@@ -186,7 +176,7 @@ struct ShowCommand: AsyncParsableCommand {
         do {
             for try await entry in stream {
                 // Apply client-side filters
-                guard filterChain.isEmpty || filterChain.matches(entry) else {
+                guard setup.filterChain.isEmpty || setup.filterChain.matches(entry) else {
                     continue
                 }
 

@@ -143,13 +143,12 @@ struct FilterChainTests {
         #expect(chain.matches(makeEntry(processName: "OtherApp", level: .error)) == false)
     }
 
-    @Test("Filter chain builder DSL")
+    @Test("Filter chain fluent builder")
     func chainBuilder() {
-        let chain = FilterChain.build { builder in
-            builder.process("MyApp")
-            builder.subsystem("com.my.app")
-            builder.minimumLevel(.info)
-        }
+        var chain = FilterChain()
+        chain.process("MyApp")
+        chain.subsystem("com.my.app")
+        chain.minimumLevel(.info)
 
         #expect(chain.count == 3)
 

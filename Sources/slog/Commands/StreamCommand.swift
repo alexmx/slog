@@ -124,45 +124,34 @@ struct StreamCommand: AsyncParsableCommand {
         // Determine output format
         let formatter = FormatterRegistry.formatter(for: effectiveFormat, highlightPattern: effectiveGrep, timeMode: effectiveTime)
 
-        // Build server-side predicate
-        let predicate = PredicateBuilder.buildPredicate(
+        // Build predicate, filter chain, and log level inclusion
+        let setup = FilterSetup.build(
             process: effectiveProcess,
             pid: effectivePid,
             subsystem: effectiveSubsystem,
             category: effectiveCategory,
-            level: effectiveLevel
+            level: effectiveLevel,
+            grep: effectiveGrep,
+            excludeGrep: effectiveExcludeGrep,
+            info: effectiveInfo,
+            debug: effectiveDebug
         )
-
-        // Build client-side filter chain for regex
-        var filterChain = FilterChain()
-        if let grepPattern = effectiveGrep {
-            filterChain.messageRegex(grepPattern)
-        }
-        if let excludePattern = effectiveExcludeGrep {
-            filterChain.excludeMessageRegex(excludePattern)
-        }
 
         // Determine target
         let target: StreamConfiguration.Target
         if effectiveSimulator {
-            let udid = try resolveSimulatorUDID(effectiveSimulatorUDID)
+            let udid = try SystemQuery.resolveSimulatorUDID(effectiveSimulatorUDID)
             target = .simulator(udid: udid)
         } else {
             target = .local
         }
 
-        // Determine log level inclusion
-        // Auto-enable debug when filtering by subsystem (unless explicit level set)
-        let autoDebug = effectiveSubsystem != nil && effectiveLevel == nil && !effectiveInfo && !effectiveDebug
-        let includeDebugLogs = effectiveDebug || autoDebug
-        let includeInfoLogs = effectiveInfo || includeDebugLogs
-
         // Create configuration
         let config = StreamConfiguration(
             target: target,
-            predicate: predicate,
-            includeInfo: includeInfoLogs,
-            includeDebug: includeDebugLogs,
+            predicate: setup.predicate,
+            includeInfo: setup.includeInfo,
+            includeDebug: setup.includeDebug,
             includeSource: effectiveSource
         )
 
@@ -181,7 +170,7 @@ struct StreamCommand: AsyncParsableCommand {
         // Run with timing constraints
         let exitCode = await runStream(
             stream,
-            filterChain: filterChain,
+            filterChain: setup.filterChain,
             formatter: formatter,
             dedupWriter: dedupWriter,
             timeoutInterval: timeoutInterval,
@@ -312,44 +301,6 @@ struct StreamCommand: AsyncParsableCommand {
         }
     }
 
-    // MARK: - Helpers
-
-    private func resolveSimulatorUDID(_ udid: String? = nil) throws -> String {
-        if let udid {
-            return udid
-        }
-
-        // Auto-detect booted simulator
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = ["simctl", "list", "devices", "booted", "-j"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-
-        try process.run()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let devices = json["devices"] as? [String: [[String: Any]]]
-        else {
-            throw StreamError.simulatorNotFound("Could not parse simulator list")
-        }
-
-        // Find first booted device
-        for (_, deviceList) in devices {
-            for device in deviceList {
-                if let state = device["state"] as? String, state == "Booted",
-                   let udid = device["udid"] as? String
-                {
-                    return udid
-                }
-            }
-        }
-
-        throw StreamError.simulatorNotFound("No booted simulator found. Boot a simulator or specify --simulator-udid")
-    }
 }
 
 // MARK: - Stream State

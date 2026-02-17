@@ -16,7 +16,7 @@ public struct JSONFormatter: LogFormatter {
     }
 
     public func format(_ entry: LogEntry) -> String {
-        let output = JSONOutput(from: entry)
+        let output = FormattedEntry(from: entry)
 
         do {
             let encoder = JSONEncoder()
@@ -63,40 +63,5 @@ public struct JSONFormatter: LogFormatter {
 
         json += "}"
         return json
-    }
-}
-
-// MARK: - JSON Output Model
-
-/// Encodable model for JSON output
-private struct JSONOutput: Encodable {
-    let timestamp: Date
-    let process: String
-    let pid: Int
-    let level: String
-    let message: String
-    let subsystem: String?
-    let category: String?
-    let threadID: Int?
-    let activityID: Int?
-    let processImagePath: String?
-    let senderImagePath: String?
-    let eventType: String?
-    let source: String?
-
-    init(from entry: LogEntry) {
-        timestamp = entry.timestamp
-        process = entry.processName
-        pid = entry.pid
-        level = entry.level.rawValue
-        message = entry.message
-        subsystem = entry.subsystem
-        category = entry.category
-        threadID = entry.threadID
-        activityID = entry.activityID
-        processImagePath = entry.processImagePath
-        senderImagePath = entry.senderImagePath
-        eventType = entry.eventType
-        source = entry.source
     }
 }

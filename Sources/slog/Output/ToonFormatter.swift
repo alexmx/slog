@@ -11,7 +11,7 @@ public struct ToonFormatter: LogFormatter {
     public init() {}
 
     public func format(_ entry: LogEntry) -> String {
-        let output = ToonOutput(from: entry)
+        let output = FormattedEntry(from: entry)
 
         do {
             let encoder = TOONEncoder()
@@ -43,39 +43,5 @@ public struct ToonFormatter: LogFormatter {
         }
 
         return lines.joined(separator: "\n")
-    }
-}
-
-// MARK: - TOON Output Model
-
-private struct ToonOutput: Encodable {
-    let timestamp: Date
-    let process: String
-    let pid: Int
-    let level: String
-    let message: String
-    let subsystem: String?
-    let category: String?
-    let threadID: Int?
-    let activityID: Int?
-    let processImagePath: String?
-    let senderImagePath: String?
-    let eventType: String?
-    let source: String?
-
-    init(from entry: LogEntry) {
-        timestamp = entry.timestamp
-        process = entry.processName
-        pid = entry.pid
-        level = entry.level.rawValue
-        message = entry.message
-        subsystem = entry.subsystem
-        category = entry.category
-        threadID = entry.threadID
-        activityID = entry.activityID
-        processImagePath = entry.processImagePath
-        senderImagePath = entry.senderImagePath
-        eventType = entry.eventType
-        source = entry.source
     }
 }
