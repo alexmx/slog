@@ -38,6 +38,9 @@ struct ShowCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Filter messages by regex pattern")
     var grep: String?
 
+    @Option(name: .long, help: "Exclude messages matching regex pattern")
+    var excludeGrep: String?
+
     // MARK: - Output Options
 
     @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
@@ -114,6 +117,7 @@ struct ShowCommand: AsyncParsableCommand {
         let effectiveCategory = category ?? prof?.category
         let effectiveLevel = level ?? prof?.resolvedLevel
         let effectiveGrep = grep ?? prof?.grep
+        let effectiveExcludeGrep = excludeGrep ?? prof?.excludeGrep
         let effectiveFormat = format ?? prof?.resolvedFormat ?? .color
         let effectiveInfo = info ?? prof?.info ?? false
         let effectiveDebug = debug ?? prof?.debug ?? false
@@ -137,6 +141,9 @@ struct ShowCommand: AsyncParsableCommand {
         var filterChain = FilterChain()
         if let grepPattern = effectiveGrep {
             filterChain.messageRegex(grepPattern)
+        }
+        if let excludePattern = effectiveExcludeGrep {
+            filterChain.excludeMessageRegex(excludePattern)
         }
 
         // Determine time range

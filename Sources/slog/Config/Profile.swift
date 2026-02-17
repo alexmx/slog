@@ -26,6 +26,9 @@ public struct Profile: Codable, Equatable, Sendable {
     /// Filter messages by regex pattern
     public var grep: String?
 
+    /// Exclude messages matching regex pattern
+    public var excludeGrep: String?
+
     /// Output format (plain, compact, color, json, toon)
     public var format: String?
 
@@ -57,6 +60,7 @@ public struct Profile: Codable, Equatable, Sendable {
         category: String? = nil,
         level: String? = nil,
         grep: String? = nil,
+        excludeGrep: String? = nil,
         format: String? = nil,
         time: String? = nil,
         info: Bool? = nil,
@@ -72,6 +76,7 @@ public struct Profile: Codable, Equatable, Sendable {
         self.category = category
         self.level = level
         self.grep = grep
+        self.excludeGrep = excludeGrep
         self.format = format
         self.time = time
         self.info = info
@@ -85,7 +90,7 @@ public struct Profile: Codable, Equatable, Sendable {
     /// Whether the profile has no fields set
     public var isEmpty: Bool {
         process == nil && pid == nil && subsystem == nil && category == nil &&
-            level == nil && grep == nil && format == nil && time == nil && info == nil &&
+            level == nil && grep == nil && excludeGrep == nil && format == nil && time == nil && info == nil &&
             debug == nil && source == nil && dedup == nil && simulator == nil && simulatorUDID == nil
     }
 

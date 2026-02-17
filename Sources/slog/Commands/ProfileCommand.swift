@@ -103,6 +103,9 @@ struct CreateProfile: ParsableCommand {
     @Option(name: .long, help: "Filter messages by regex pattern")
     var grep: String?
 
+    @Option(name: .long, help: "Exclude messages matching regex pattern")
+    var excludeGrep: String?
+
     // MARK: - Output Options
 
     @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
@@ -139,6 +142,7 @@ struct CreateProfile: ParsableCommand {
             category: category,
             level: level?.rawValue.lowercased(),
             grep: grep,
+            excludeGrep: excludeGrep,
             format: format?.rawValue,
             time: time?.rawValue,
             info: info ? true : nil,

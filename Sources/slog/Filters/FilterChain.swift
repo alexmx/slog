@@ -67,6 +67,13 @@ public struct FilterChain: Sendable {
         return self
     }
 
+    /// Add an exclusion regex filter on the message (NOT match)
+    @discardableResult
+    public mutating func excludeMessageRegex(_ pattern: String) -> FilterChain {
+        add(NotPredicate(MessageRegexPredicate(pattern: pattern)))
+        return self
+    }
+
     /// Test if an entry passes all filters
     public func matches(_ entry: LogEntry) -> Bool {
         predicates.allSatisfy { $0.matches(entry) }
