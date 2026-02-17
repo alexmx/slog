@@ -37,9 +37,9 @@ struct ListProcesses: ParsableCommand {
         process.standardOutput = pipe
 
         try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
         guard let output = String(data: data, encoding: .utf8) else {
             print("Failed to read process list")
             return
@@ -109,9 +109,8 @@ struct ListSimulators: ParsableCommand {
         process.standardOutput = pipe
 
         try process.run()
-        process.waitUntilExit()
-
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let devices = json["devices"] as? [String: [[String: Any]]]
