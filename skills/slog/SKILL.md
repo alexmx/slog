@@ -1,5 +1,5 @@
 ---
-name: use-slog
+name: slog
 description: Guide for using the slog CLI tool to stream, query, and filter macOS/iOS logs. Use when the user asks how to use slog, needs help building slog commands, wants to filter logs, stream from simulators, or work with log archives.
 user-invocable: false
 ---
