@@ -12,7 +12,7 @@ Help the user construct the right slog command for their needs.
 
 ## Commands
 
-slog has four commands: `stream` (default), `show`, `profile`, and `list`.
+slog has six commands: `stream` (default), `show`, `profile`, `list`, `doctor`, and `mcp`.
 
 ## Stream (default)
 
@@ -33,11 +33,15 @@ slog stream [options]
 - `--category <name>` — filter by category
 - `--level <level>` — minimum level: `debug`, `info`, `default`, `error`, `fault`
 - `--grep <pattern>` — regex filter on message content
+- `--exclude-grep <pattern>` — exclude messages matching regex
 
 **Output:**
 - `--format <fmt>` — `plain`, `compact`, `color` (default), `json`, `toon`
-- `--info` — include info-level messages
-- `--debug` — include debug-level messages
+- `--time <mode>` — timestamp mode: `absolute` (default), `relative`
+- `--info` / `--no-info` — include info-level messages
+- `--debug` / `--no-debug` — include debug-level messages
+- `--source` / `--no-source` — include source location info
+- `--dedup` / `--no-dedup` — collapse consecutive identical messages
 
 **Bounded capture (for scripts/automation):**
 - `--timeout <duration>` — max wait for first log (exits code 1 if exceeded)
@@ -56,6 +60,8 @@ slog stream --simulator --process MyApp
 slog stream --process MyApp --count 10
 slog stream --process MyApp --timeout 30s --capture 10s
 slog stream --process MyApp --format json | jq '.message'
+slog stream --process MyApp --exclude-grep heartbeat
+slog stream --process MyApp --dedup
 ```
 
 ## Show
@@ -73,9 +79,9 @@ slog show [options] [archive-path]
 
 `--last` and `--start`/`--end` are mutually exclusive.
 
-**Filters:** same as stream (`--process`, `--pid`, `--subsystem`, `--category`, `--level`, `--grep`).
+**Filters:** same as stream (`--process`, `--pid`, `--subsystem`, `--category`, `--level`, `--grep`, `--exclude-grep`).
 
-**Output:** same as stream (`--format`, `--info`, `--debug`, `--count`).
+**Output:** same as stream (`--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`, `--count`).
 
 ### Show Examples
 
@@ -87,6 +93,7 @@ slog show --last boot --subsystem com.apple.network
 slog show --start "2024-01-15 10:00:00" --end "2024-01-15 11:00:00"
 slog show --last 5m --format json | jq '.message'
 slog show /path/to/file.logarchive
+slog show --last 5m --grep "api.*users" --exclude-grep health
 ```
 
 ## Profile
@@ -116,6 +123,27 @@ slog stream --profile myapp --level error --format json
 slog list processes [--filter <name>]     # List running processes
 slog list simulators [--booted] [--all]   # List iOS Simulators
 ```
+
+## Doctor
+
+Check system requirements and diagnose issues.
+
+```bash
+slog doctor
+```
+
+Checks: log CLI, stream access, log archive access, simulator support (xcrun simctl), profiles directory.
+
+## MCP
+
+Start an MCP (Model Context Protocol) server for AI tool integration.
+
+```bash
+slog mcp            # Start MCP server (stdio transport)
+slog mcp --setup    # Print integration instructions for Claude Code, VS Code, Cursor, etc.
+```
+
+Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`.
 
 ## Key Behaviors
 

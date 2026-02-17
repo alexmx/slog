@@ -35,11 +35,15 @@ Stream logs from macOS or iOS Simulator.
 - `--category <name>` - Filter by category
 - `--level <level>` - Minimum log level: debug, info, default, error, fault
 - `--grep <pattern>` - Filter messages by regex pattern
+- `--exclude-grep <pattern>` - Exclude messages matching regex pattern
 
 **Output Options:**
 - `--format <fmt>` - Output format: plain, compact, color (default), json, toon
-- `--info` - Include info-level messages
-- `--debug` - Include debug-level messages
+- `--time <mode>` - Timestamp mode: absolute (default), relative
+- `--info` / `--no-info` - Include info-level messages
+- `--debug` / `--no-debug` - Include debug-level messages
+- `--source` / `--no-source` - Include source location info
+- `--dedup` / `--no-dedup` - Collapse consecutive identical messages
 
 **Timing Options (for bounded capture):**
 - `--timeout <duration>` - Max wait for first log (exits with code 1 if exceeded)
@@ -64,11 +68,15 @@ Query historical/persisted logs from the macOS log archive.
 - `--category <name>` - Filter by category
 - `--level <level>` - Minimum log level: debug, info, default, error, fault
 - `--grep <pattern>` - Filter messages by regex pattern
+- `--exclude-grep <pattern>` - Exclude messages matching regex pattern
 
 **Output Options:**
 - `--format <fmt>` - Output format: plain, compact, color (default), json, toon
-- `--info` - Include info-level messages
-- `--debug` - Include debug-level messages
+- `--time <mode>` - Timestamp mode: absolute (default), relative
+- `--info` / `--no-info` - Include info-level messages
+- `--debug` / `--no-debug` - Include debug-level messages
+- `--source` / `--no-source` - Include source location info
+- `--dedup` / `--no-dedup` - Collapse consecutive identical messages
 - `--count <n>` - Maximum number of entries to display
 
 **Archive:**
@@ -91,6 +99,27 @@ Both `stream` and `show` accept `--profile <name>` to load a saved profile. CLI 
 
 - `list processes [--filter <name>]` - List running processes
 - `list simulators [--booted] [--all]` - List iOS Simulators
+
+### Doctor Command
+
+Check system requirements and diagnose issues.
+
+```bash
+slog doctor
+```
+
+Checks: log CLI, stream access, log archive access, simulator support, profiles directory.
+
+### MCP Command
+
+Start an MCP (Model Context Protocol) server for AI tool integration.
+
+```bash
+slog mcp            # Start MCP server (stdio transport)
+slog mcp --setup    # Print integration instructions
+```
+
+Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`.
 
 ### Examples
 
@@ -120,6 +149,19 @@ slog show --start "2024-01-15 10:00:00" --end "2024-01-15 11:00:00"
 slog show --last 5m --format json | jq '.message'
 slog show /path/to/file.logarchive
 
+# Filtering
+slog stream --process MyApp --grep "error|fail"
+slog stream --process MyApp --exclude-grep heartbeat
+slog show --last 5m --grep "api.*users" --exclude-grep health
+
+# Dedup & source
+slog stream --process MyApp --dedup
+slog stream --process MyApp --source
+
+# Doctor & MCP
+slog doctor
+slog mcp --setup
+
 # Profiles
 slog profile create myapp --process MyApp --subsystem com.myapp --level debug --format compact
 slog stream --profile myapp
@@ -139,17 +181,20 @@ slog profile delete myapp
 ```
 Sources/slog/
 ├── Commands/           # CLI commands using ArgumentParser
-│   ├── RootCommand.swift    # @main entry point with 4 subcommands
+│   ├── RootCommand.swift    # @main entry point with 6 subcommands
 │   ├── StreamCommand.swift  # Main log streaming with filters
 │   ├── ShowCommand.swift    # Historical log queries
 │   ├── ProfileCommand.swift # Profile management (create/list/show/delete)
-│   └── ListCommand.swift    # List processes/simulators
+│   ├── ListCommand.swift    # List processes/simulators
+│   ├── DoctorCommand.swift  # System requirements checker
+│   └── MCPCommand.swift     # MCP server for AI tool integration
 ├── Core/               # Log handling
 │   ├── LogEntry.swift       # LogEntry struct, LogLevel enum
 │   ├── LogParser.swift      # NDJSON and legacy format parser
 │   ├── LogStreamer.swift    # Stream process management, PredicateBuilder
 │   ├── LogReader.swift      # Historical log reading via `log show`
-│   └── DurationParser.swift # Duration string parsing (e.g., "5s", "2m")
+│   ├── DurationParser.swift # Duration string parsing (e.g., "5s", "2m")
+│   └── Version.swift        # Version constant (overridden by CI)
 ├── Config/             # Configuration and profiles
 │   ├── XDGDirectories.swift # XDG-compliant path resolution
 │   ├── Profile.swift        # Profile data model (Codable)
@@ -157,9 +202,14 @@ Sources/slog/
 ├── Filters/            # Filtering system
 │   ├── FilterChain.swift    # Thread-safe filter chain with DSL
 │   └── Predicates.swift     # 10+ predicate types (composable)
+├── MCP/                # MCP server tools
+│   └── SlogTools.swift      # 5 MCP tool definitions reusing core logic
 └── Output/             # Formatters
     ├── Formatter.swift      # Protocol, registry, OutputFormat enum
     └── *Formatter.swift     # Plain, Color, JSON, Toon implementations
+
+Sources/TestEmitter/    # Test log emitter for end-to-end testing
+└── main.swift               # Emits known logs across 5 subsystems/levels
 ```
 
 **Key patterns:**
@@ -193,12 +243,25 @@ swift test                    # Run all tests
 swift test --filter <name>    # Run specific test
 ```
 
+### Test Emitter
+
+A separate executable that emits known log entries for end-to-end testing:
+
+```bash
+swift run slog-test-emitter              # Emit all test logs once
+swift run slog-test-emitter --repeat 5   # Repeat 5 times (1s interval)
+swift run slog-test-emitter --continuous  # Emit every second until interrupted
+```
+
+Emits 21 entries per batch across subsystems (`com.slog.test`, `com.slog.test.network`, `com.slog.test.database`) and all 5 log levels.
+
 ## Dependencies
 
 - `swift-argument-parser` - CLI parsing and command structure
 - `swift-subprocess` - Modern async process execution
 - `Rainbow` - ANSI color support for terminal output
 - `ToonFormat` - TOON (Token-Oriented Object Notation) encoding
+- `SwiftMCP` (`swift-cli-mcp`) - MCP server framework for AI tool integration
 
 ## Git Commits
 
