@@ -165,9 +165,9 @@ public struct PredicateBuilder: Sendable {
         components.append("processID == \(pid)")
     }
 
-    /// Filter by subsystem
+    /// Filter by subsystem (uses BEGINSWITH to include child subsystems)
     public mutating func subsystem(_ subsystem: String) {
-        components.append("subsystem == \"\(subsystem)\"")
+        components.append("subsystem BEGINSWITH \"\(subsystem)\"")
     }
 
     /// Filter by category

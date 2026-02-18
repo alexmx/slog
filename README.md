@@ -1,8 +1,12 @@
 # slog
 
-A fast, modern Swift CLI for streaming and filtering macOS and iOS Simulator logs.
+Tame the macOS log firehose from your terminal.
 
-slog wraps Apple's `log` CLI to provide enhanced filtering, multiple output formats, saved profiles, and time-bounded capture for automation workflows.
+<p align="center">
+  <img width="1011" height="611" alt="slog color output showing filtered logs with mixed levels" src="" />
+</p>
+
+A macOS CLI tool and MCP server for streaming, filtering, and querying system logs. slog wraps Apple's unified logging system to provide powerful filtering by process, subsystem, level, and regex—with multiple output formats, saved profiles, iOS Simulator support, and time-bounded capture for automation workflows. Use it from the command line or through an MCP server optimized for AI agents.
 
 ## Features
 

@@ -107,7 +107,7 @@ struct FilterSetupTests {
             category: "http"
         )
 
-        #expect(setup.predicate?.contains("subsystem == \"com.apple.network\"") == true)
+        #expect(setup.predicate?.contains("subsystem BEGINSWITH \"com.apple.network\"") == true)
         #expect(setup.predicate?.contains("category == \"http\"") == true)
         #expect(setup.predicate?.contains(" AND ") == true)
     }

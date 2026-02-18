@@ -27,39 +27,39 @@ func emitTestLogs(batch: Int) {
     let prefix = batch > 0 ? "[batch-\(batch)] " : ""
 
     // Default level
-    defaultLogger.log("\(prefix)Application started successfully")
-    defaultLogger.log("\(prefix)Configuration loaded from defaults")
+    defaultLogger.log("\(prefix, privacy: .public)Application started successfully")
+    defaultLogger.log("\(prefix, privacy: .public)Configuration loaded from defaults")
 
     // Info level
-    defaultLogger.info("\(prefix)User session initialized with token abc-123")
-    networkLogger.info("\(prefix)DNS resolved api.example.com to 93.184.216.34")
+    defaultLogger.info("\(prefix, privacy: .public)User session initialized with token abc-123")
+    networkLogger.info("\(prefix, privacy: .public)DNS resolved api.example.com to 93.184.216.34")
 
     // Debug level
-    defaultLogger.debug("\(prefix)Cache hit ratio: 0.87 (hits=174, misses=26)")
-    databaseLogger.debug("\(prefix)Query plan: sequential scan on users WHERE active=true")
-    performanceLogger.debug("\(prefix)Frame render time: 16.2ms (target: 16.6ms)")
+    defaultLogger.debug("\(prefix, privacy: .public)Cache hit ratio: 0.87 (hits=174, misses=26)")
+    databaseLogger.debug("\(prefix, privacy: .public)Query plan: sequential scan on users WHERE active=true")
+    performanceLogger.debug("\(prefix, privacy: .public)Frame render time: 16.2ms (target: 16.6ms)")
 
     // Error level
-    authLogger.error("\(prefix)Authentication failed: invalid credentials for user@example.com")
-    networkLogger.error("\(prefix)Connection timeout after 30s to api.example.com:443")
-    databaseLogger.error("\(prefix)Deadlock detected on table 'orders', retrying transaction")
+    authLogger.error("\(prefix, privacy: .public)Authentication failed: invalid credentials for user@example.com")
+    networkLogger.error("\(prefix, privacy: .public)Connection timeout after 30s to api.example.com:443")
+    databaseLogger.error("\(prefix, privacy: .public)Deadlock detected on table 'orders', retrying transaction")
 
     // Fault level
-    defaultLogger.fault("\(prefix)Out of memory: failed to allocate 256MB buffer")
-    networkLogger.fault("\(prefix)TLS handshake failed: certificate expired for api.example.com")
+    defaultLogger.fault("\(prefix, privacy: .public)Out of memory: failed to allocate 256MB buffer")
+    networkLogger.fault("\(prefix, privacy: .public)TLS handshake failed: certificate expired for api.example.com")
 
     // Messages with special patterns (for grep/exclude-grep testing)
-    defaultLogger.log("\(prefix)heartbeat: system healthy, uptime 3d 14h 22m")
-    defaultLogger.log("\(prefix)heartbeat: all services responding")
-    networkLogger.log("\(prefix)GET /api/v1/users -> 200 OK (42ms)")
-    networkLogger.log("\(prefix)POST /api/v1/orders -> 201 Created (128ms)")
-    networkLogger.log("\(prefix)GET /api/v1/health -> 200 OK (2ms)")
-    databaseLogger.log("\(prefix)SELECT * FROM users WHERE id=42 -- 1 row (0.3ms)")
-    databaseLogger.log("\(prefix)INSERT INTO audit_log (action, user_id) VALUES ('login', 42) -- 1 row (1.2ms)")
+    defaultLogger.log("\(prefix, privacy: .public)heartbeat: system healthy, uptime 3d 14h 22m")
+    defaultLogger.log("\(prefix, privacy: .public)heartbeat: all services responding")
+    networkLogger.log("\(prefix, privacy: .public)GET /api/v1/users -> 200 OK (42ms)")
+    networkLogger.log("\(prefix, privacy: .public)POST /api/v1/orders -> 201 Created (128ms)")
+    networkLogger.log("\(prefix, privacy: .public)GET /api/v1/health -> 200 OK (2ms)")
+    databaseLogger.log("\(prefix, privacy: .public)SELECT * FROM users WHERE id=42 -- 1 row (0.3ms)")
+    databaseLogger.log("\(prefix, privacy: .public)INSERT INTO audit_log (action, user_id) VALUES ('login', 42) -- 1 row (1.2ms)")
 
     // Messages with unicode and special characters
-    defaultLogger.log("\(prefix)User 'José García' logged in from São Paulo")
-    defaultLogger.log("\(prefix)Processing file: report_2026-Q1_final (v2).pdf")
+    defaultLogger.log("\(prefix, privacy: .public)User 'José García' logged in from São Paulo")
+    defaultLogger.log("\(prefix, privacy: .public)Processing file: report_2026-Q1_final (v2).pdf")
 }
 
 let entriesPerBatch = 21

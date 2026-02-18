@@ -35,13 +35,13 @@ struct StreamConfigurationTests {
     func equality() {
         let a = StreamConfiguration(
             target: .local,
-            predicate: "subsystem == \"com.test\"",
+            predicate: "subsystem BEGINSWITH \"com.test\"",
             includeInfo: true,
             includeDebug: true
         )
         let b = StreamConfiguration(
             target: .local,
-            predicate: "subsystem == \"com.test\"",
+            predicate: "subsystem BEGINSWITH \"com.test\"",
             includeInfo: true,
             includeDebug: true
         )
@@ -106,12 +106,12 @@ struct LogStreamerCommandTests {
 
     @Test("Predicate argument included when set")
     func predicateArg() {
-        let config = StreamConfiguration(predicate: "subsystem == \"com.test\"")
+        let config = StreamConfiguration(predicate: "subsystem BEGINSWITH \"com.test\"")
         let (_, args) = streamer.buildCommand(for: config)
 
         #expect(args.contains("--predicate"))
         if let idx = args.firstIndex(of: "--predicate") {
-            #expect(args[idx + 1] == "subsystem == \"com.test\"")
+            #expect(args[idx + 1] == "subsystem BEGINSWITH \"com.test\"")
         }
     }
 
@@ -140,7 +140,7 @@ struct LogStreamerCommandTests {
     func simulatorPreservesFlags() throws {
         let config = StreamConfiguration(
             target: .simulator(udid: "U"),
-            predicate: "subsystem == \"test\"",
+            predicate: "subsystem BEGINSWITH \"test\"",
             includeInfo: true,
             includeDebug: true,
             includeSource: true

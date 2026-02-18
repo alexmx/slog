@@ -35,7 +35,7 @@ struct PredicateBuilderTests {
         builder.subsystem("com.apple.network")
         let predicate = builder.build()
 
-        #expect(predicate == "subsystem == \"com.apple.network\"")
+        #expect(predicate == "subsystem BEGINSWITH \"com.apple.network\"")
     }
 
     @Test("Category predicate uses equality")
@@ -103,7 +103,7 @@ struct PredicateBuilderTests {
 
         #expect(predicate?.contains(" AND ") == true)
         #expect(predicate?.contains("processImagePath ENDSWITH \"/MyApp\"") == true)
-        #expect(predicate?.contains("subsystem == \"com.my.app\"") == true)
+        #expect(predicate?.contains("subsystem BEGINSWITH \"com.my.app\"") == true)
     }
 
     @Test("Empty builder returns nil")
@@ -129,7 +129,7 @@ struct PredicateBuilderTests {
         #expect(predicate != nil)
         #expect(try #require(predicate?.contains("processImagePath ENDSWITH \"/MyApp\"")))
         #expect(try #require(predicate?.contains("processID == 42")))
-        #expect(try #require(predicate?.contains("subsystem == \"com.my.app\"")))
+        #expect(try #require(predicate?.contains("subsystem BEGINSWITH \"com.my.app\"")))
         #expect(try #require(predicate?.contains("category == \"net\"")))
         #expect(try #require(predicate?.contains("messageType >= 16")))
     }
@@ -145,7 +145,7 @@ struct PredicateBuilderTests {
     func buildPredicateSingle() {
         let predicate = PredicateBuilder.buildPredicate(subsystem: "com.apple.network")
 
-        #expect(predicate == "subsystem == \"com.apple.network\"")
+        #expect(predicate == "subsystem BEGINSWITH \"com.apple.network\"")
         #expect(predicate?.contains(" AND ") == false)
     }
 }

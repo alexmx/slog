@@ -11,7 +11,7 @@ import Foundation
 public struct JSONFormatter: LogFormatter {
     private let pretty: Bool
 
-    public init(pretty: Bool = false) {
+    public init(pretty: Bool = true) {
         self.pretty = pretty
     }
 
