@@ -16,8 +16,7 @@ A macOS CLI tool and MCP server for streaming, filtering, and querying system lo
 - **Saved profiles** for reusable filter/format combinations
 - **Time-bounded capture** with `--timeout`, `--capture`, and `--count` for scripting
 - **Auto-detection** of booted iOS Simulators
-- **MCP server** for AI agent integration with 5 tools
-- **Modern Swift** built with async/await and Swift Concurrency
+- **MCP server** for AI agent integration
 
 ## Installation
 
