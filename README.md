@@ -3,7 +3,7 @@
 Tame the macOS log firehose from your terminal.
 
 <p align="center">
-  <img width="1011" height="611" alt="slog color output showing filtered logs with mixed levels" src="" />
+  <img width="1280" height="914" alt="slog color output showing filtered logs with mixed levels" src="https://github.com/user-attachments/assets/85da8a0c-a5ef-4c7a-912a-0ba64ba0d080" />
 </p>
 
 A macOS CLI tool and MCP server for streaming, filtering, and querying system logs. slog wraps Apple's unified logging system to provide powerful filtering by process, subsystem, level, and regex—with multiple output formats, saved profiles, iOS Simulator support, and time-bounded capture for automation workflows. Use it from the command line or through an MCP server optimized for AI agents.
