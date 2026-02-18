@@ -2,9 +2,9 @@ name: Release
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [main]
-  #   paths: ['.slog-version']
+  push:
+    branches: [main]
+    paths: ['.slog-version']
 
 permissions:
   contents: write
