@@ -306,15 +306,6 @@ MCP tools return JSON format. For token-optimized output, use the CLI with `--fo
 
 A comprehensive skill guide is available in `skills/slog/SKILL.md` that teaches AI agents how to use slog effectively. The skill includes detailed command examples, filtering strategies, and best practices optimized for AI agent usage.
 
-## Building
-
-```bash
-swift build                     # Debug build
-swift build -c release          # Release build
-swift run slog stream --process Finder  # Run directly
-swift test                      # Run tests
-```
-
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
