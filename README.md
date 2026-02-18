@@ -28,17 +28,6 @@ brew tap alexmx/tools
 brew install slog
 ```
 
-### From Source
-
-Requires Swift 6.2+ and macOS 26+.
-
-```bash
-git clone https://github.com/alexmx/slog.git
-cd slog
-swift build -c release
-cp .build/release/slog /usr/local/bin/
-```
-
 ## Quick Start
 
 ```bash
