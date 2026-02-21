@@ -24,7 +24,7 @@ A macOS CLI tool and MCP server for streaming, filtering, and querying system lo
 
 ```bash
 brew tap alexmx/tools
-brew install slog
+brew install alexmx/tools/slog
 ```
 
 ## Quick Start
