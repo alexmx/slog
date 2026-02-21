@@ -23,7 +23,6 @@ A macOS CLI tool and MCP server for streaming, filtering, and querying system lo
 ### Homebrew
 
 ```bash
-brew tap alexmx/tools
 brew install alexmx/tools/slog
 ```
 
