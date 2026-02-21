@@ -26,6 +26,12 @@ A macOS CLI tool and MCP server for streaming, filtering, and querying system lo
 brew install alexmx/tools/slog
 ```
 
+### Mise
+
+```bash
+mise use --global github:alexmx/slog
+```
+
 ## Quick Start
 
 ```bash
