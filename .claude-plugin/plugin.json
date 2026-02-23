@@ -1,0 +1,12 @@
+{
+  "name": "slog",
+  "description": "Stream, filter, and query macOS and iOS logs",
+  "version": "1.0.0",
+  "author": {
+    "name": "alexmx"
+  },
+  "homepage": "https://github.com/alexmx/slog",
+  "repository": "https://github.com/alexmx/slog",
+  "license": "MIT",
+  "keywords": ["macos", "ios", "logs", "debugging", "mcp"]
+}

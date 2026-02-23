@@ -1,0 +1,6 @@
+{
+  "slog": {
+    "command": "slog",
+    "args": ["mcp"]
+  }
+}
