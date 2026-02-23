@@ -278,9 +278,17 @@ slog can run as an MCP server, making log querying available to AI agents for au
 
 ### Setup
 
-1. Install slog via Homebrew
-2. Run `slog mcp --setup` for configuration instructions
-3. If your AI agent is not listed, configure manually:
+#### Claude Code (plugin)
+
+```bash
+/plugin marketplace add alexmx/claude-tools
+/plugin install slog@alexmx-tools
+```
+
+#### Other agents
+
+1. Run `slog mcp --setup` for configuration instructions
+2. If your AI agent is not listed, configure manually:
 
 ```json
 {
@@ -293,7 +301,7 @@ slog can run as an MCP server, making log querying available to AI agents for au
 }
 ```
 
-4. Restart your MCP client
+3. Restart your MCP client
 
 ### Available Tools
 
