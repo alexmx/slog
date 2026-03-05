@@ -1,6 +1,8 @@
 {
-  "slog": {
-    "command": "slog",
-    "args": ["mcp"]
+  "mcpServers": {
+    "slog": {
+      "command": "slog",
+      "args": ["mcp"]
+    }
   }
 }
