@@ -6,6 +6,30 @@
 import Foundation
 import SwiftMCP
 
+// Thread-safe sendable container for collecting log entries
+class SendableEntryContainer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _entries: [LogEntry] = []
+
+    var entries: [LogEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _entries
+    }
+
+    func append(_ entry: LogEntry) {
+        lock.lock()
+        defer { lock.unlock() }
+        _entries.append(entry)
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _entries.count
+    }
+}
+
 enum SlogTools {
     // MARK: - Helpers
 
@@ -88,6 +112,9 @@ enum SlogTools {
 
         @InputProperty("Number of entries to capture (required, max 1000). Controls how long the stream runs.")
         var count: Int
+
+        @InputProperty("Maximum time to wait in seconds (default: 30). Stream returns collected entries when timeout is reached, even if count hasn't been met.")
+        var timeout: Int?
 
         @InputProperty("Stream from iOS Simulator instead of host (use slog_list_simulators to find devices)")
         var simulator: Bool?
@@ -226,20 +253,31 @@ enum SlogTools {
 
         let streamer = LogStreamer()
         let stream = streamer.stream(configuration: config)
+        let timeoutSeconds = args.timeout ?? 30
+        let filterChain = setup.filterChain
 
-        var entries: [LogEntry] = []
+        let container = SendableEntryContainer()
 
-        do {
+        // Stream collection task
+        let streamTask = Task {
             for try await entry in stream {
-                guard setup.filterChain.isEmpty || setup.filterChain.matches(entry) else { continue }
-                entries.append(entry)
-                if entries.count >= count { break }
+                guard filterChain.isEmpty || filterChain.matches(entry) else { continue }
+                container.append(entry)
+                if container.count >= count { break }
             }
-        } catch is CancellationError {
-            // Cancelled
         }
 
-        return try json(entries)
+        // Timeout task — cancels stream if it takes too long
+        let timeoutTask = Task {
+            try await Task.sleep(for: .seconds(timeoutSeconds))
+            streamTask.cancel()
+        }
+
+        // Wait for stream to finish (either by count or cancellation)
+        _ = await streamTask.result
+        timeoutTask.cancel()
+
+        return try json(container.entries)
     }
 
     static let listProcesses = MCPTool(

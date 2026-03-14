@@ -304,7 +304,7 @@ skillman install github.com/alexmx/slog
 
 All log commands are exposed as MCP tools with the `slog_` prefix:
 - `slog_show` — Query historical logs with filters and time ranges
-- `slog_stream` — Stream live logs with bounded capture (max 1000 entries)
+- `slog_stream` — Stream live logs with bounded capture (max 1000 entries, default 30s timeout)
 - `slog_list_processes` — List running processes with optional name filter
 - `slog_list_simulators` — List iOS Simulators
 - `slog_doctor` — Check system requirements
