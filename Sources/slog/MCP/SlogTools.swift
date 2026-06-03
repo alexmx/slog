@@ -6,6 +6,24 @@
 import Foundation
 import SwiftMCP
 
+// Thread-safe sendable one-shot flag
+final class SendableBoolFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+
+    func set() {
+        lock.lock()
+        defer { lock.unlock() }
+        value = true
+    }
+
+    func get() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
 // Thread-safe sendable container for collecting log entries
 class SendableEntryContainer: @unchecked Sendable {
     private let lock = NSLock()
@@ -27,6 +45,45 @@ class SendableEntryContainer: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return _entries.count
+    }
+}
+
+/// Response shape for `slog_show`. Mirrors `StreamResult` so callers can
+/// tell an empty result from a misconfigured filter — `hint` is populated
+/// only when `count == 0` and we can guess why (custom-subsystem debug
+/// persistence, process-only query, too-short window).
+struct ShowResult: Encodable {
+    let entries: [LogEntry]
+    let count: Int
+    let elapsedMs: Int
+    let hint: String?
+
+    enum CodingKeys: String, CodingKey {
+        case entries
+        case count
+        case hint
+        case elapsedMs = "elapsed_ms"
+    }
+}
+
+/// Response shape for `slog_stream`. Wraps entries with diagnostic metadata
+/// so callers can tell whether an empty result means "nothing matched in the
+/// time window" (`stoppedBy: timeout`) vs "filter caught nothing and the stream
+/// itself closed" (`exhausted`).
+struct StreamResult: Encodable {
+    let entries: [LogEntry]
+    let captured: Int
+    let requested: Int
+    /// `count` (reached requested limit) | `timeout` | `exhausted` | `error`
+    let stoppedBy: String
+    let elapsedMs: Int
+
+    enum CodingKeys: String, CodingKey {
+        case entries
+        case captured
+        case requested
+        case stoppedBy = "stopped_by"
+        case elapsedMs = "elapsed_ms"
     }
 }
 
@@ -148,6 +205,12 @@ enum SlogTools {
         Use 'start'/'end' for date ranges. \
         **Start with broad filters** (process only), then narrow with subsystem/level/grep. \
         When filtering by subsystem, debug logs are automatically included.
+
+        **Note on debug events:** Custom (non-Apple) subsystems do not persist \
+        debug-level events by default — `log show` cannot replay them after the fact, \
+        even with the --debug flag. If you see 0 results from a subsystem you know \
+        is logging, use `slog_stream` for live capture instead, or enable persistence \
+        once via `sudo log config --mode 'persist:debug' --subsystem <name>`.
         """
     ) { (args: ShowArgs) in
         // Validate: need at least one time source
@@ -195,6 +258,7 @@ enum SlogTools {
 
         var entries: [LogEntry] = []
         let maxCount = args.count ?? 500
+        let started = Date()
 
         do {
             for try await entry in stream {
@@ -206,19 +270,61 @@ enum SlogTools {
             // Cancelled
         }
 
-        return try json(entries)
+        let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+        let result = ShowResult(
+            entries: entries,
+            count: entries.count,
+            elapsedMs: elapsedMs,
+            hint: entries.isEmpty ? emptyShowHint(args: args) : nil
+        )
+        return try json(result)
+    }
+
+    /// Reasons we can offer when `slog_show` returns 0 entries. Order matters
+    /// — the most specific cause wins.
+    private static func emptyShowHint(args: ShowArgs) -> String? {
+        if args.subsystem != nil, args.level == nil {
+            return """
+            No events matched. Custom subsystems often emit only debug events, \
+            which aren't persisted by default — try `slog_stream` for live capture, \
+            or pre-enable persistence via `sudo log config --subsystem <name> --mode persist:debug`.
+            """
+        }
+        if args.process != nil, args.subsystem == nil {
+            return """
+            No events matched. Process-only queries see only default+ persistent events. \
+            If you control the app, filter by its subsystem and use `slog_stream` for debug events.
+            """
+        }
+        if let last = args.last, last.hasSuffix("s") || last == "1m" {
+            return "No events matched. Try widening the time range (e.g. `5m` or `1h`)."
+        }
+        return nil
     }
 
     static let stream = MCPTool(
         name: "slog_stream",
         description: """
         Stream live macOS/iOS logs with bounded capture. **Use this for real-time debugging** — \
-        watching logs as they happen. Returns log entries as JSON array. \
-        The 'count' parameter is required (max 1000) to ensure bounded capture. \
-        **For investigating past events, use slog_show instead.** \
+        watching logs as they happen. The 'count' parameter is required (max 1000) to \
+        ensure bounded capture. **For investigating past events, use slog_show instead** \
+        (with the caveat that custom subsystems do not persist debug events). \
         Start with broad filters (process only), then narrow with subsystem/level/grep. \
         Supports iOS Simulator via 'simulator' flag. \
-        When filtering by subsystem, debug logs are automatically included.
+        When filtering by subsystem, debug logs are automatically included — \
+        **this is the right tool for capturing debug events from your own app's subsystem**, \
+        since `slog_show` only sees them if persistence was pre-enabled.
+
+        Returns a JSON object:
+          { "entries": [...], "captured": N, "requested": N, "stopped_by": "...", "elapsed_ms": N }
+
+        `stopped_by` tells you why the stream ended:
+          - "count"     — reached `requested` entries (success path)
+          - "timeout"   — hit `timeout` seconds without enough matches
+          - "exhausted" — stream closed before count/timeout (rare)
+          - "error"     — underlying `log stream` failed
+        Use `elapsed_ms` and `captured` to decide whether to retry with a wider window \
+        or a different filter when `entries` is empty.
         """
     ) { (args: StreamArgs) in
         let count = min(args.count, 1000)
@@ -257,6 +363,8 @@ enum SlogTools {
         let filterChain = setup.filterChain
 
         let container = SendableEntryContainer()
+        let startTime = Date()
+        let timedOut = SendableBoolFlag()
 
         // Stream collection task
         let streamTask = Task {
@@ -270,14 +378,34 @@ enum SlogTools {
         // Timeout task — cancels stream if it takes too long
         let timeoutTask = Task {
             try await Task.sleep(for: .seconds(timeoutSeconds))
+            timedOut.set()
             streamTask.cancel()
         }
 
         // Wait for stream to finish (either by count or cancellation)
-        _ = await streamTask.result
+        let streamResult = await streamTask.result
         timeoutTask.cancel()
 
-        return try json(container.entries)
+        let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
+        let captured = container.count
+        let stoppedBy: String = if timedOut.get() {
+            "timeout"
+        } else if case .failure = streamResult {
+            "error"
+        } else if captured >= count {
+            "count"
+        } else {
+            "exhausted"
+        }
+
+        let result = StreamResult(
+            entries: container.entries,
+            captured: captured,
+            requested: count,
+            stoppedBy: stoppedBy,
+            elapsedMs: elapsedMs
+        )
+        return try json(result)
     }
 
     static let listProcesses = MCPTool(
