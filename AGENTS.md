@@ -61,7 +61,7 @@ swift test                      # Run all tests
 
 **AI agents:** Always use the **haiku model with a Bash subagent** when running `swift build`, `swift test`, `git commit`, or `git push` to minimize cost and latency.
 
-**Requirements:** macOS 26+, Swift 6.2, Xcode toolchain.
+**Requirements:** macOS 15+, Swift 6.2, Xcode toolchain.
 
 **Dependencies:**
 - `swift-argument-parser` — CLI argument parsing

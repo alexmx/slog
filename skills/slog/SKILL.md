@@ -149,11 +149,15 @@ iPhone 16e (Booted)  ABC-123-DEF  iOS 18.4
 
 ```bash
 $ slog doctor
-log CLI:          ok
-Stream access:    ok
-Archive access:   ok
-Simulator support: ok
-Profiles dir:     ok (/Users/alex/.config/slog/profiles)
+slog doctor
+
+  [OK] log CLI (/usr/bin/log)
+  [OK] Log stream access
+  [OK] Log archive access (log show)
+  [OK] Simulator support (xcrun simctl)
+  [OK] Profiles directory (/Users/alex/.config/slog/profiles)
+
+All checks passed. slog is ready to use.
 ```
 
 ### `slog mcp` — Start MCP server

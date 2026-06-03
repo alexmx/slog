@@ -311,6 +311,8 @@ All log commands are exposed as MCP tools with the `slog_` prefix:
 
 MCP tools return JSON format. For token-optimized output, use the CLI with `--format toon`.
 
+`slog_show` returns `{ entries, count, elapsed_ms, hint? }` and `slog_stream` returns `{ entries, captured, requested, stopped_by, elapsed_ms }`. The `hint` field on `slog_show` is populated only when `count == 0` and explains the most likely cause (e.g. custom subsystems don't persist debug events by default — use `slog_stream` for live capture). `stopped_by` on `slog_stream` is one of `count` / `timeout` / `exhausted` / `error`.
+
 ### AI Agent Skill
 
 A comprehensive skill guide is available in `skills/slog/SKILL.md` that teaches AI agents how to use slog effectively. The skill includes detailed command examples, filtering strategies, and best practices optimized for AI agent usage.
