@@ -100,20 +100,59 @@ enum SlogTools {
     private static func json(_ value: some Encodable) throws -> MCPToolResult {
         let data = try encoder.encode(value)
         guard let string = String(data: data, encoding: .utf8) else {
-            return .text("{\"error\": \"Failed to encode result\"}")
+            return .text("{\"error\":\"Failed to encode result\"}")
         }
         return .text(string)
     }
 
-    /// JSON error payload formatted so MCP clients can surface it cleanly.
-    /// We hand-build the JSON to keep the error path allocation-free and
-    /// independent of the encoder above.
+    /// `{ "error": "<message>" }` payload for tool failures. Uses the same
+    /// encoder as `json` so escaping (quotes, backslashes, newlines, unicode)
+    /// stays consistent with success responses.
     private static func errorJSON(_ message: String) -> MCPToolResult {
-        let escaped = message
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: " ")
-        return .text("{\"error\": \"\(escaped)\"}")
+        guard
+            let data = try? encoder.encode(["error": message]),
+            let string = String(data: data, encoding: .utf8)
+        else {
+            return .text("{\"error\":\"Failed to encode error\"}")
+        }
+        return .text(string)
+    }
+
+    /// Outcome of `buildFilterSetup`: the parsed setup or a ready-to-return
+    /// error envelope. Lets MCP handlers do `switch … case .failure: return`
+    /// without nested do/catch around the shared setup step.
+    enum FilterSetupOutcome {
+        case ok(FilterSetup)
+        case failed(MCPToolResult)
+    }
+
+    /// Build a `FilterSetup` from MCP args, packaging `FilterSetupError` into
+    /// an `errorJSON` payload.
+    private static func buildFilterSetup(
+        process: String?,
+        pid: Int?,
+        subsystem: String?,
+        category: String?,
+        level: String?,
+        grep: String?,
+        excludeGrep: String?
+    ) -> FilterSetupOutcome {
+        do {
+            let setup = try FilterSetup.build(
+                process: process,
+                pid: pid,
+                subsystem: subsystem,
+                category: category,
+                level: level.flatMap { LogLevel(string: $0) },
+                grep: grep,
+                excludeGrep: excludeGrep
+            )
+            return .ok(setup)
+        } catch let error as FilterSetupError {
+            return .failed(errorJSON(error.errorDescription ?? "\(error)"))
+        } catch {
+            return .failed(errorJSON("\(error)"))
+        }
     }
 
 
@@ -235,18 +274,17 @@ enum SlogTools {
         }
 
         let setup: FilterSetup
-        do {
-            setup = try FilterSetup.build(
-                process: args.process,
-                pid: args.pid,
-                subsystem: args.subsystem,
-                category: args.category,
-                level: args.level.flatMap { LogLevel(string: $0) },
-                grep: args.grep,
-                excludeGrep: args.exclude_grep
-            )
-        } catch let error as FilterSetupError {
-            return errorJSON(error.errorDescription ?? "\(error)")
+        switch buildFilterSetup(
+            process: args.process,
+            pid: args.pid,
+            subsystem: args.subsystem,
+            category: args.category,
+            level: args.level,
+            grep: args.grep,
+            excludeGrep: args.exclude_grep
+        ) {
+        case .ok(let value): setup = value
+        case .failed(let result): return result
         }
 
         // Determine time range
@@ -353,18 +391,17 @@ enum SlogTools {
         let count = args.count
 
         let setup: FilterSetup
-        do {
-            setup = try FilterSetup.build(
-                process: args.process,
-                pid: args.pid,
-                subsystem: args.subsystem,
-                category: args.category,
-                level: args.level.flatMap { LogLevel(string: $0) },
-                grep: args.grep,
-                excludeGrep: args.exclude_grep
-            )
-        } catch let error as FilterSetupError {
-            return errorJSON(error.errorDescription ?? "\(error)")
+        switch buildFilterSetup(
+            process: args.process,
+            pid: args.pid,
+            subsystem: args.subsystem,
+            category: args.category,
+            level: args.level,
+            grep: args.grep,
+            excludeGrep: args.exclude_grep
+        ) {
+        case .ok(let value): setup = value
+        case .failed(let result): return result
         }
 
         let target: StreamConfiguration.Target

@@ -282,15 +282,10 @@ struct StreamCommand: AsyncParsableCommand {
         timeoutTask?.cancel()
         captureTask?.cancel()
 
-        // Determine exit code
-        let reason = await state.stopReason
-        switch reason {
-        case .timeout:
-            return 1
-        case .error:
-            return 1
-        default:
-            return 0
+        // Determine exit code: timeout and error are failures, everything else succeeds.
+        switch await state.stopReason {
+        case .timeout, .error: return 1
+        case .none, .captureComplete, .countReached: return 0
         }
     }
 }
