@@ -223,18 +223,22 @@ enum SlogTools {
         name: "slog_show",
         description: """
         Query historical/persisted macOS logs. **Use this for post-mortem analysis** — \
-        investigating what happened in the recent past. Returns log entries as JSON array. \
-        Requires at least 'last', 'start', or 'archive_path'. \
-        Use 'last' for recent logs (e.g. '5m', '1h', 'boot'). \
-        Use 'start'/'end' for date ranges. \
-        **Start with broad filters** (process only), then narrow with subsystem/level/grep. \
-        When filtering by subsystem, debug logs are automatically included.
+        investigating what happened in the recent past.
 
-        **Note on debug events:** Custom (non-Apple) subsystems do not persist \
-        debug-level events by default — `log show` cannot replay them after the fact, \
-        even with the --debug flag. If you see 0 results from a subsystem you know \
-        is logging, use `slog_stream` for live capture instead, or enable persistence \
-        once via `sudo log config --mode 'persist:debug' --subsystem <name>`.
+        Requires one time source: `last` ('5m', '1h', 'boot'), `start`/`end` date range, \
+        or `archive_path`. Start with broad filters (process only), then narrow with \
+        subsystem/level/grep. Filtering by `subsystem` auto-includes debug+info; \
+        otherwise only default+ levels are returned.
+
+        Returns `{ entries, count, elapsed_ms, hint? }`. The optional `hint` appears \
+        only when `count == 0` and explains the most likely cause (e.g. custom-subsystem \
+        debug persistence, process-only query, time window too short).
+
+        **Note on debug events:** Custom (non-Apple) subsystems do not persist debug-level \
+        events by default — `log show` cannot replay them after the fact, even with --debug. \
+        If you see 0 results from a subsystem you know is logging, use `slog_stream` for \
+        live capture instead, or enable persistence once via \
+        `sudo log config --subsystem <name> --mode persist:debug`.
         """
     ) { (args: ShowArgs) in
         // Validate: need at least one time source
@@ -332,26 +336,22 @@ enum SlogTools {
     static let stream = MCPTool(
         name: "slog_stream",
         description: """
-        Stream live macOS/iOS logs with bounded capture. **Use this for real-time debugging** — \
-        watching logs as they happen. The 'count' parameter is required (max 1000) to \
-        ensure bounded capture. **For investigating past events, use slog_show instead** \
-        (with the caveat that custom subsystems do not persist debug events). \
-        Start with broad filters (process only), then narrow with subsystem/level/grep. \
-        Supports iOS Simulator via 'simulator' flag. \
-        When filtering by subsystem, debug logs are automatically included — \
-        **this is the right tool for capturing debug events from your own app's subsystem**, \
-        since `slog_show` only sees them if persistence was pre-enabled.
+        Stream live macOS/iOS logs with bounded capture. **Use this for real-time debugging** \
+        and for capturing debug events from your own app's subsystem (which `slog_show` cannot \
+        see unless persistence was pre-enabled).
 
-        Returns a JSON object:
-          { "entries": [...], "captured": N, "requested": N, "stopped_by": "...", "elapsed_ms": N }
+        `count` is required and must be 1–1000; the call returns as soon as that many entries \
+        match, or `timeout` seconds pass (default 30s), whichever comes first. Start with broad \
+        filters (process only), then narrow with subsystem/level/grep. Filtering by `subsystem` \
+        auto-includes debug+info. iOS Simulator capture via `simulator: true`.
 
-        `stopped_by` tells you why the stream ended:
+        Returns `{ entries, captured, requested, stopped_by, elapsed_ms }`. `stopped_by`:
           - "count"     — reached `requested` entries (success path)
           - "timeout"   — hit `timeout` seconds without enough matches
           - "exhausted" — stream closed before count/timeout (rare)
           - "error"     — underlying `log stream` failed
-        Use `elapsed_ms` and `captured` to decide whether to retry with a wider window \
-        or a different filter when `entries` is empty.
+        When `entries` is empty, inspect `elapsed_ms` and `stopped_by` to decide whether to \
+        retry with a wider window or a different filter.
         """
     ) { (args: StreamArgs) in
         guard args.count > 0 else {

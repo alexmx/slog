@@ -25,7 +25,18 @@ struct MCPCommand: AsyncParsableCommand {
         let server = MCPServer(
             name: "slog",
             version: slogVersion,
-            description: "Stream and filter macOS/iOS logs — query historical logs, stream live output, and filter by process, subsystem, level, or regex. Workflow: slog_list_processes to find process names, then slog_show for recent/historical logs or slog_stream for live capture. Start with broad filters (process only), then narrow with subsystem/level/grep.",
+            description: """
+            Stream and filter macOS/iOS unified logs.
+
+            Workflow: (1) discover targets with `slog_list_processes` / \
+            `slog_list_simulators`; (2) for past events use `slog_show` with a time range, \
+            for live debugging use `slog_stream` with a bounded `count`. Start broad \
+            (process only), then narrow with subsystem/level/grep.
+
+            Custom-subsystem debug events do not persist by default — `slog_show` cannot \
+            replay them, so reach for `slog_stream` when chasing debug-level output from \
+            your own app.
+            """,
             tools: SlogTools.all
         )
         await server.run()
