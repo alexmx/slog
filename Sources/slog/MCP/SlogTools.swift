@@ -105,6 +105,30 @@ enum SlogTools {
         return .text(string)
     }
 
+    /// JSON error payload formatted so MCP clients can surface it cleanly.
+    /// We hand-build the JSON to keep the error path allocation-free and
+    /// independent of the encoder above.
+    private static func errorJSON(_ message: String) -> MCPToolResult {
+        let escaped = message
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: " ")
+        return .text("{\"error\": \"\(escaped)\"}")
+    }
+
+    /// Validate a regex pattern at the MCP boundary so the user gets a
+    /// targeted error ("Invalid 'grep'…") instead of a raw NSError dump
+    /// when NSRegularExpression compilation fails inside FilterSetup.
+    private static func validateRegex(_ pattern: String?, field: String) -> MCPToolResult? {
+        guard let pattern else { return nil }
+        do {
+            _ = try NSRegularExpression(pattern: pattern, options: .caseInsensitive)
+            return nil
+        } catch {
+            return errorJSON("Invalid '\(field)' regex: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Argument Types
 
     struct ShowArgs: MCPToolInput {
@@ -215,8 +239,11 @@ enum SlogTools {
     ) { (args: ShowArgs) in
         // Validate: need at least one time source
         guard args.last != nil || args.start != nil || args.archive_path != nil else {
-            return .text("{\"error\": \"Specify 'last', 'start', or 'archive_path'\"}")
+            return errorJSON("Specify 'last', 'start', or 'archive_path'")
         }
+
+        if let err = validateRegex(args.grep, field: "grep") { return err }
+        if let err = validateRegex(args.exclude_grep, field: "exclude_grep") { return err }
 
         let setup = try FilterSetup.build(
             process: args.process,
@@ -327,10 +354,16 @@ enum SlogTools {
         or a different filter when `entries` is empty.
         """
     ) { (args: StreamArgs) in
-        let count = min(args.count, 1000)
-        guard count > 0 else {
-            return .text("{\"error\": \"'count' must be a positive integer\"}")
+        guard args.count > 0 else {
+            return errorJSON("'count' must be a positive integer")
         }
+        guard args.count <= 1000 else {
+            return errorJSON("'count' must be <= 1000 (got \(args.count)). Use a smaller window or run multiple streams.")
+        }
+        let count = args.count
+
+        if let err = validateRegex(args.grep, field: "grep") { return err }
+        if let err = validateRegex(args.exclude_grep, field: "exclude_grep") { return err }
 
         let setup = try FilterSetup.build(
             process: args.process,
