@@ -116,18 +116,6 @@ enum SlogTools {
         return .text("{\"error\": \"\(escaped)\"}")
     }
 
-    /// Validate a regex pattern at the MCP boundary so the user gets a
-    /// targeted error ("Invalid 'grep'…") instead of a raw NSError dump
-    /// when NSRegularExpression compilation fails inside FilterSetup.
-    private static func validateRegex(_ pattern: String?, field: String) -> MCPToolResult? {
-        guard let pattern else { return nil }
-        do {
-            _ = try NSRegularExpression(pattern: pattern, options: .caseInsensitive)
-            return nil
-        } catch {
-            return errorJSON("Invalid '\(field)' regex: \(error.localizedDescription)")
-        }
-    }
 
     // MARK: - Argument Types
 
@@ -246,18 +234,20 @@ enum SlogTools {
             return errorJSON("Specify 'last', 'start', or 'archive_path'")
         }
 
-        if let err = validateRegex(args.grep, field: "grep") { return err }
-        if let err = validateRegex(args.exclude_grep, field: "exclude_grep") { return err }
-
-        let setup = try FilterSetup.build(
-            process: args.process,
-            pid: args.pid,
-            subsystem: args.subsystem,
-            category: args.category,
-            level: args.level.flatMap { LogLevel(string: $0) },
-            grep: args.grep,
-            excludeGrep: args.exclude_grep
-        )
+        let setup: FilterSetup
+        do {
+            setup = try FilterSetup.build(
+                process: args.process,
+                pid: args.pid,
+                subsystem: args.subsystem,
+                category: args.category,
+                level: args.level.flatMap { LogLevel(string: $0) },
+                grep: args.grep,
+                excludeGrep: args.exclude_grep
+            )
+        } catch let error as FilterSetupError {
+            return errorJSON(error.errorDescription ?? "\(error)")
+        }
 
         // Determine time range
         let timeRange: ShowConfiguration.TimeRange? = if let last = args.last {
@@ -362,18 +352,20 @@ enum SlogTools {
         }
         let count = args.count
 
-        if let err = validateRegex(args.grep, field: "grep") { return err }
-        if let err = validateRegex(args.exclude_grep, field: "exclude_grep") { return err }
-
-        let setup = try FilterSetup.build(
-            process: args.process,
-            pid: args.pid,
-            subsystem: args.subsystem,
-            category: args.category,
-            level: args.level.flatMap { LogLevel(string: $0) },
-            grep: args.grep,
-            excludeGrep: args.exclude_grep
-        )
+        let setup: FilterSetup
+        do {
+            setup = try FilterSetup.build(
+                process: args.process,
+                pid: args.pid,
+                subsystem: args.subsystem,
+                category: args.category,
+                level: args.level.flatMap { LogLevel(string: $0) },
+                grep: args.grep,
+                excludeGrep: args.exclude_grep
+            )
+        } catch let error as FilterSetupError {
+            return errorJSON(error.errorDescription ?? "\(error)")
+        }
 
         let target: StreamConfiguration.Target
         if args.simulator == true {

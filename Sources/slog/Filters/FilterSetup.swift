@@ -46,10 +46,12 @@ public struct FilterSetup: Sendable {
 
         var filterChain = FilterChain()
         if let grep {
-            try filterChain.messageRegex(grep)
+            do { try filterChain.messageRegex(grep) }
+            catch { throw FilterSetupError.invalidRegex(field: "grep", reason: error.localizedDescription) }
         }
         if let excludeGrep {
-            try filterChain.excludeMessageRegex(excludeGrep)
+            do { try filterChain.excludeMessageRegex(excludeGrep) }
+            catch { throw FilterSetupError.invalidRegex(field: "exclude_grep", reason: error.localizedDescription) }
         }
 
         let autoDebug = subsystem != nil && level == nil && !info && !debug
@@ -62,5 +64,16 @@ public struct FilterSetup: Sendable {
             includeInfo: includeInfo,
             includeDebug: includeDebug
         )
+    }
+}
+
+public enum FilterSetupError: Error, LocalizedError {
+    case invalidRegex(field: String, reason: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidRegex(let field, let reason):
+            "Invalid '\(field)' regex: \(reason)"
+        }
     }
 }
