@@ -256,13 +256,7 @@ struct StreamCommand: AsyncParsableCommand {
         // Set up capture duration monitoring
         let captureTask: Task<Void, Never>? = captureInterval.map { interval in
             Task {
-                // Wait for first entry
-                while true {
-                    let hasEntry = await state.hasReceivedEntry
-                    let stopped = await state.shouldStop
-                    if hasEntry || stopped { break }
-                    try? await Task.sleep(for: .milliseconds(50))
-                }
+                await state.waitForFirstEntry()
 
                 // Cancel timeout since we got first entry
                 timeoutTask?.cancel()
@@ -317,14 +311,32 @@ private actor StreamState {
     private(set) var shouldStop = false
     private(set) var stopReason: StopReason = .none
 
+    private var firstEntryWaiter: CheckedContinuation<Void, Never>?
+
     func recordEntry() {
+        let wasFirst = !hasReceivedEntry
         entryCount += 1
         hasReceivedEntry = true
+        if wasFirst { resumeFirstEntryWaiter() }
     }
 
     func stop(reason: StopReason) {
         guard !shouldStop else { return }
         shouldStop = true
         stopReason = reason
+        resumeFirstEntryWaiter()
+    }
+
+    /// Suspend until `recordEntry` or `stop` fires. Returns immediately if
+    /// either has already happened — no polling, no scheduled wake-ups.
+    func waitForFirstEntry() async {
+        if hasReceivedEntry || shouldStop { return }
+        await withCheckedContinuation { firstEntryWaiter = $0 }
+    }
+
+    private func resumeFirstEntryWaiter() {
+        guard let waiter = firstEntryWaiter else { return }
+        firstEntryWaiter = nil
+        waiter.resume()
     }
 }
