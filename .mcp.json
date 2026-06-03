@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "slog": {
-      "command": "slog",
+      "command": "/Users/alexmx/Projects/slog/.build/debug/slog",
       "args": ["mcp"]
     }
   }
