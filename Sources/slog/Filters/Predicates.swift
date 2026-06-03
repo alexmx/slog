@@ -191,22 +191,3 @@ public struct NotPredicate: LogPredicate {
     }
 }
 
-// MARK: - Always/Never Predicates
-
-/// Always matches (passes all entries through)
-public struct AlwaysPredicate: LogPredicate {
-    public init() {}
-
-    public func matches(_: LogEntry) -> Bool {
-        true
-    }
-}
-
-/// Never matches (filters out all entries)
-public struct NeverPredicate: LogPredicate {
-    public init() {}
-
-    public func matches(_: LogEntry) -> Bool {
-        false
-    }
-}

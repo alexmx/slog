@@ -53,13 +53,6 @@ public struct FilterChain: Sendable {
         return self
     }
 
-    /// Add a message substring filter
-    @discardableResult
-    public mutating func messageContains(_ substring: String) -> FilterChain {
-        add(MessageContainsPredicate(substring: substring))
-        return self
-    }
-
     /// Add a regex filter on the message
     @discardableResult
     public mutating func messageRegex(_ pattern: String) throws -> FilterChain {

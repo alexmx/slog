@@ -215,13 +215,8 @@ struct StreamCommand: AsyncParsableCommand {
                         continue
                     }
 
-                    // Handle first entry - notify state
-                    let isFirst = await state.recordEntry()
-                    if isFirst {
-                        // First entry received
-                    }
+                    await state.recordEntry()
 
-                    // Output the entry
                     if let dedupWriter {
                         dedupWriter.write(entry)
                     } else {
@@ -322,12 +317,9 @@ private actor StreamState {
     private(set) var shouldStop = false
     private(set) var stopReason: StopReason = .none
 
-    /// Record an entry and return true if this is the first entry
-    func recordEntry() -> Bool {
+    func recordEntry() {
         entryCount += 1
-        let isFirst = !hasReceivedEntry
         hasReceivedEntry = true
-        return isFirst
     }
 
     func stop(reason: StopReason) {
