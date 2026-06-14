@@ -8,18 +8,18 @@
 import ArgumentParser
 import Foundation
 
-/// Represents the severity level of a log entry
+/// Represents the severity level of a log entry.
+/// Cases are declared in ascending severity order, which `Comparable` relies on.
 public enum LogLevel: String, Codable, CaseIterable, Comparable, Sendable {
-    case `default` = "Default"
-    case info = "Info"
     case debug = "Debug"
+    case info = "Info"
+    case `default` = "Default"
     case error = "Error"
     case fault = "Fault"
 
     public static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
-        let order: [LogLevel] = [.debug, .info, .default, .error, .fault]
-        guard let lhsIndex = order.firstIndex(of: lhs),
-              let rhsIndex = order.firstIndex(of: rhs)
+        guard let lhsIndex = allCases.firstIndex(of: lhs),
+              let rhsIndex = allCases.firstIndex(of: rhs)
         else {
             return false
         }

@@ -27,12 +27,12 @@ struct MCPCommand: AsyncParsableCommand {
             version: slogVersion,
             description: """
             Stream and filter macOS/iOS unified logs.
-
+            
             Workflow: (1) discover targets with `slog_list_processes` / \
             `slog_list_simulators`; (2) for past events use `slog_show` with a time range, \
             for live debugging use `slog_stream` with a bounded `count`. Start broad \
             (process only), then narrow with subsystem/level/grep.
-
+            
             Custom-subsystem debug events do not persist by default — `slog_show` cannot \
             replay them, so reach for `slog_stream` when chasing debug-level output from \
             your own app.

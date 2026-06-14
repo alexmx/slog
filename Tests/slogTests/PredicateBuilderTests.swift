@@ -11,7 +11,7 @@ import Testing
 struct PredicateBuilderTests {
     // MARK: - Individual Predicates
 
-    @Test("Process predicate uses ENDSWITH")
+    @Test
     func processFilter() {
         var builder = PredicateBuilder()
         builder.processes(["Finder"])
@@ -20,7 +20,7 @@ struct PredicateBuilderTests {
         #expect(predicate == "processImagePath ENDSWITH \"/Finder\"")
     }
 
-    @Test("Multiple processes OR-grouped")
+    @Test
     func multipleProcesses() {
         var builder = PredicateBuilder()
         builder.processes(["Finder", "Dock"])
@@ -29,7 +29,7 @@ struct PredicateBuilderTests {
         #expect(predicate == "(processImagePath ENDSWITH \"/Finder\" OR processImagePath ENDSWITH \"/Dock\")")
     }
 
-    @Test("Empty processes array contributes no component")
+    @Test
     func emptyProcesses() {
         var builder = PredicateBuilder()
         builder.processes([])
@@ -39,7 +39,7 @@ struct PredicateBuilderTests {
         #expect(predicate == "processID == 42")
     }
 
-    @Test("PID predicate uses equality")
+    @Test
     func pidFilter() {
         var builder = PredicateBuilder()
         builder.pid(1234)
@@ -48,7 +48,7 @@ struct PredicateBuilderTests {
         #expect(predicate == "processID == 1234")
     }
 
-    @Test("Subsystem predicate uses BEGINSWITH")
+    @Test
     func subsystemFilter() {
         var builder = PredicateBuilder()
         builder.subsystems(["com.apple.network"])
@@ -57,16 +57,17 @@ struct PredicateBuilderTests {
         #expect(predicate == "subsystem BEGINSWITH \"com.apple.network\"")
     }
 
-    @Test("Multiple subsystems OR-grouped")
+    @Test
     func multipleSubsystems() {
         var builder = PredicateBuilder()
         builder.subsystems(["com.apple.network", "com.apple.CFNetwork"])
         let predicate = builder.build()
 
-        #expect(predicate == "(subsystem BEGINSWITH \"com.apple.network\" OR subsystem BEGINSWITH \"com.apple.CFNetwork\")")
+        #expect(predicate ==
+            "(subsystem BEGINSWITH \"com.apple.network\" OR subsystem BEGINSWITH \"com.apple.CFNetwork\")")
     }
 
-    @Test("Category predicate uses equality")
+    @Test
     func categoryFilter() {
         var builder = PredicateBuilder()
         builder.categories(["http"])
@@ -75,7 +76,7 @@ struct PredicateBuilderTests {
         #expect(predicate == "category == \"http\"")
     }
 
-    @Test("Multiple categories OR-grouped")
+    @Test
     func multipleCategories() {
         var builder = PredicateBuilder()
         builder.categories(["http", "dns"])
@@ -85,7 +86,6 @@ struct PredicateBuilderTests {
     }
 
     @Test(
-        "Level predicate uses messageType with correct values",
         arguments: [
             (LogLevel.debug, 0),
             (LogLevel.info, 1),
@@ -102,36 +102,9 @@ struct PredicateBuilderTests {
         #expect(predicate == "messageType >= \(value)")
     }
 
-    @Test("Message contains predicate uses CONTAINS")
-    func messageContainsFilter() {
-        var builder = PredicateBuilder()
-        builder.messageContains("error")
-        let predicate = builder.build()
-
-        #expect(predicate == "eventMessage CONTAINS \"error\"")
-    }
-
-    @Test("Message contains escapes quotes")
-    func messageContainsEscapesQuotes() {
-        var builder = PredicateBuilder()
-        builder.messageContains("say \"hello\"")
-        let predicate = builder.build()
-
-        #expect(predicate == "eventMessage CONTAINS \"say \\\"hello\\\"\"")
-    }
-
-    @Test("Message contains escapes backslashes before quotes")
-    func messageContainsEscapesBackslashes() {
-        var builder = PredicateBuilder()
-        builder.messageContains("path\\to\\file")
-        let predicate = builder.build()
-
-        #expect(predicate == "eventMessage CONTAINS \"path\\\\to\\\\file\"")
-    }
-
     // MARK: - Combinations
 
-    @Test("Multiple predicates joined with AND")
+    @Test
     func multiplePredicates() {
         var builder = PredicateBuilder()
         builder.processes(["MyApp"])
@@ -143,7 +116,7 @@ struct PredicateBuilderTests {
         #expect(predicate?.contains("subsystem BEGINSWITH \"com.my.app\"") == true)
     }
 
-    @Test("Empty builder returns nil")
+    @Test
     func emptyBuilder() {
         let builder = PredicateBuilder()
         let predicate = builder.build()
@@ -153,7 +126,7 @@ struct PredicateBuilderTests {
 
     // MARK: - Static Helper
 
-    @Test("buildPredicate with all parameters")
+    @Test
     func buildPredicateAllParams() throws {
         let predicate = PredicateBuilder.buildPredicate(
             processes: ["MyApp"],
@@ -171,14 +144,14 @@ struct PredicateBuilderTests {
         #expect(try #require(predicate?.contains("messageType >= 16")))
     }
 
-    @Test("buildPredicate with no parameters returns nil")
+    @Test
     func buildPredicateEmpty() {
         let predicate = PredicateBuilder.buildPredicate()
 
         #expect(predicate == nil)
     }
 
-    @Test("buildPredicate with single parameter")
+    @Test
     func buildPredicateSingle() {
         let predicate = PredicateBuilder.buildPredicate(subsystems: ["com.apple.network"])
 
@@ -186,8 +159,8 @@ struct PredicateBuilderTests {
         #expect(predicate?.contains(" AND ") == false)
     }
 
-    @Test("buildPredicate OR-groups multiple subsystems and ANDs with category")
-    func buildPredicateMultipleSubsystemsWithCategory() throws {
+    @Test
+    func buildPredicateMultipleSubsystemsWithCategory() {
         let predicate = PredicateBuilder.buildPredicate(
             subsystems: ["com.apple.network", "com.apple.CFNetwork"],
             categories: ["http"]

@@ -9,7 +9,7 @@ import Testing
 
 @Suite("XDGDirectories Tests")
 struct XDGDirectoriesTests {
-    @Test("Falls back to ~/.config when XDG_CONFIG_HOME is unset")
+    @Test
     func fallbackToDefault() {
         // When XDG_CONFIG_HOME is not set to an absolute path, should use ~/.config
         let configHome = XDGDirectories.configHome
@@ -17,13 +17,13 @@ struct XDGDirectoriesTests {
         #expect(configHome.path.hasPrefix("/"))
     }
 
-    @Test("Profiles directory is under slog/profiles")
+    @Test
     func profilesDirectory() {
         let dir = XDGDirectories.profilesDirectory
         #expect(dir.path.hasSuffix("slog/profiles"))
     }
 
-    @Test("slogConfig is under slog")
+    @Test
     func slogConfig() {
         let dir = XDGDirectories.slogConfig
         #expect(dir.path.hasSuffix("slog"))
@@ -32,7 +32,7 @@ struct XDGDirectoriesTests {
 
 @Suite("Profile Tests")
 struct ProfileTests {
-    @Test("Profile encode/decode round-trip")
+    @Test
     func roundTrip() throws {
         let profile = Profile(
             process: "MyApp",
@@ -51,7 +51,7 @@ struct ProfileTests {
         #expect(decoded == profile)
     }
 
-    @Test("Profile with only partial fields")
+    @Test
     func partialFields() throws {
         let json = """
         {"process": "Finder", "level": "error"}
@@ -67,55 +67,55 @@ struct ProfileTests {
         #expect(profile.debug == nil)
     }
 
-    @Test("Empty profile has isEmpty true")
+    @Test
     func emptyProfile() {
         let profile = Profile()
         #expect(profile.isEmpty)
     }
 
-    @Test("Non-empty profile has isEmpty false")
+    @Test
     func nonEmptyProfile() {
         let profile = Profile(process: "Test")
         #expect(!profile.isEmpty)
     }
 
-    @Test("resolvedLevel returns valid LogLevel")
+    @Test
     func resolvedLevel() {
         let profile = Profile(level: "error")
         #expect(profile.resolvedLevel == .error)
     }
 
-    @Test("resolvedLevel returns nil for invalid level")
+    @Test
     func resolvedLevelInvalid() {
         let profile = Profile(level: "invalid")
         #expect(profile.resolvedLevel == nil)
     }
 
-    @Test("resolvedFormat returns valid OutputFormat")
+    @Test
     func resolvedFormat() {
         let profile = Profile(format: "json")
         #expect(profile.resolvedFormat == .json)
     }
 
-    @Test("resolvedFormat returns nil for invalid format")
+    @Test
     func resolvedFormatInvalid() {
         let profile = Profile(format: "invalid")
         #expect(profile.resolvedFormat == nil)
     }
 
-    @Test("resolvedTimeMode returns valid TimeMode")
+    @Test
     func resolvedTimeMode() {
         let profile = Profile(time: "relative")
         #expect(profile.resolvedTimeMode == .relative)
     }
 
-    @Test("resolvedTimeMode returns nil for invalid time")
+    @Test
     func resolvedTimeModeInvalid() {
         let profile = Profile(time: "invalid")
         #expect(profile.resolvedTimeMode == nil)
     }
 
-    @Test("Nil fields are omitted from JSON")
+    @Test
     func nilFieldsOmitted() throws {
         let profile = Profile(process: "MyApp")
         let encoder = JSONEncoder()
@@ -144,7 +144,7 @@ struct ProfileManagerTests {
         try body(tempDir)
     }
 
-    @Test("Save and load profile")
+    @Test
     func saveAndLoad() throws {
         try withTempProfileDir { dir in
             let profile = Profile(process: "TestApp", level: "info", format: "json")
@@ -164,7 +164,7 @@ struct ProfileManagerTests {
         }
     }
 
-    @Test("List profiles returns sorted names")
+    @Test
     func listProfiles() throws {
         try withTempProfileDir { dir in
             let profile = Profile(process: "Test")
@@ -185,7 +185,7 @@ struct ProfileManagerTests {
         }
     }
 
-    @Test("Delete profile removes file")
+    @Test
     func deleteProfile() throws {
         try withTempProfileDir { dir in
             let url = dir.appendingPathComponent("todelete.json")
@@ -200,7 +200,7 @@ struct ProfileManagerTests {
         }
     }
 
-    @Test("ProfileError descriptions are meaningful")
+    @Test
     func errorDescriptions() {
         let notFound = ProfileError.notFound("test")
         #expect(notFound.errorDescription?.contains("test") == true)

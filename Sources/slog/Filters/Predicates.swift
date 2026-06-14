@@ -29,7 +29,7 @@ public struct ProcessNamePredicate: LogPredicate {
         if caseSensitive {
             entry.processName == processName
         } else {
-            entry.processName.lowercased() == processName.lowercased()
+            entry.processName.caseInsensitiveCompare(processName) == .orderedSame
         }
     }
 }
@@ -98,39 +98,7 @@ public struct MinimumLevelPredicate: LogPredicate {
     }
 }
 
-/// Matches entries at exactly a specific log level
-public struct ExactLevelPredicate: LogPredicate {
-    public let level: LogLevel
-
-    public init(level: LogLevel) {
-        self.level = level
-    }
-
-    public func matches(_ entry: LogEntry) -> Bool {
-        entry.level == level
-    }
-}
-
 // MARK: - Message Predicates
-
-/// Matches entries where the message contains a substring
-public struct MessageContainsPredicate: LogPredicate {
-    public let substring: String
-    public let caseSensitive: Bool
-
-    public init(substring: String, caseSensitive: Bool = false) {
-        self.substring = substring
-        self.caseSensitive = caseSensitive
-    }
-
-    public func matches(_ entry: LogEntry) -> Bool {
-        if caseSensitive {
-            entry.message.contains(substring)
-        } else {
-            entry.message.lowercased().contains(substring.lowercased())
-        }
-    }
-}
 
 /// Matches entries where the message matches a regular expression
 public struct MessageRegexPredicate: LogPredicate {
@@ -152,32 +120,6 @@ public struct MessageRegexPredicate: LogPredicate {
 
 // MARK: - Composite Predicates
 
-/// Matches entries that match ALL of the given predicates (AND)
-public struct AllOfPredicate: LogPredicate {
-    public let predicates: [any LogPredicate]
-
-    public init(predicates: [any LogPredicate]) {
-        self.predicates = predicates
-    }
-
-    public func matches(_ entry: LogEntry) -> Bool {
-        predicates.allSatisfy { $0.matches(entry) }
-    }
-}
-
-/// Matches entries that match ANY of the given predicates (OR)
-public struct AnyOfPredicate: LogPredicate {
-    public let predicates: [any LogPredicate]
-
-    public init(predicates: [any LogPredicate]) {
-        self.predicates = predicates
-    }
-
-    public func matches(_ entry: LogEntry) -> Bool {
-        predicates.contains { $0.matches(entry) }
-    }
-}
-
 /// Inverts the result of another predicate (NOT)
 public struct NotPredicate: LogPredicate {
     public let predicate: any LogPredicate
@@ -190,4 +132,3 @@ public struct NotPredicate: LogPredicate {
         !predicate.matches(entry)
     }
 }
-

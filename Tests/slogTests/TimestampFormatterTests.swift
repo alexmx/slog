@@ -9,7 +9,7 @@ import Testing
 
 @Suite("TimestampFormatter Tests")
 struct TimestampFormatterTests {
-    @Test("Absolute mode formats as HH:mm:ss.SSS")
+    @Test
     func absoluteMode() throws {
         let formatter = TimestampFormatter(mode: .absolute)
         var calendar = Calendar(identifier: .gregorian)
@@ -24,7 +24,7 @@ struct TimestampFormatterTests {
         #expect(result == "14:30:45.123")
     }
 
-    @Test("Relative mode shows +0.000s for first entry")
+    @Test
     func relativeFirstEntry() {
         let formatter = TimestampFormatter(mode: .relative)
         let date = Date()
@@ -33,7 +33,7 @@ struct TimestampFormatterTests {
         #expect(result == "+0.000s")
     }
 
-    @Test("Relative mode shows delta for subsequent entries")
+    @Test
     func relativeDelta() {
         let formatter = TimestampFormatter(mode: .relative)
         let base = Date()
@@ -43,7 +43,7 @@ struct TimestampFormatterTests {
         #expect(result == "+0.312s")
     }
 
-    @Test("Relative mode shows seconds for sub-minute deltas")
+    @Test
     func relativeSeconds() {
         let formatter = TimestampFormatter(mode: .relative)
         let base = Date()
@@ -53,7 +53,7 @@ struct TimestampFormatterTests {
         #expect(result == "+5.500s")
     }
 
-    @Test("Relative mode shows minutes for >= 60s deltas")
+    @Test
     func relativeMinutes() {
         let formatter = TimestampFormatter(mode: .relative)
         let base = Date()
@@ -63,7 +63,7 @@ struct TimestampFormatterTests {
         #expect(result == "+2m05.00s")
     }
 
-    @Test("Relative mode shows hours for >= 3600s deltas")
+    @Test
     func relativeHours() {
         let formatter = TimestampFormatter(mode: .relative)
         let base = Date()
@@ -73,7 +73,7 @@ struct TimestampFormatterTests {
         #expect(result == "+1h02m")
     }
 
-    @Test("Relative mode tracks running delta between consecutive entries")
+    @Test
     func relativeRunningDelta() {
         let formatter = TimestampFormatter(mode: .relative)
         let base = Date()

@@ -76,42 +76,23 @@ public struct ColorFormatter: LogFormatter {
     }
 
     private func coloredLevel(_ level: LogLevel) -> String {
-        let levelStr: String
-        let colored: String
-
-        switch level {
-        case .debug:
-            levelStr = "DEBUG"
-            colored = levelStr.lightBlack
-        case .info:
-            levelStr = "INFO"
-            colored = levelStr.blue
-        case .default:
-            levelStr = "DEFAULT"
-            colored = levelStr.white
-        case .error:
-            levelStr = "ERROR"
-            colored = levelStr.red.bold
-        case .fault:
-            levelStr = "FAULT"
-            colored = levelStr.red.bold.blink
+        let text = level.rawValue.uppercased()
+        let colored: String = switch level {
+        case .debug: text.lightBlack
+        case .info: text.blue
+        case .default: text.white
+        case .error: text.red.bold
+        case .fault: text.red.bold.blink
         }
-
         return "[\(colored)]"
     }
 
     private func colorMessage(_ message: String, level: LogLevel) -> String {
         switch level {
-        case .debug:
-            message.lightBlack
-        case .info:
-            message
-        case .default:
-            message
-        case .error:
-            message.red
-        case .fault:
-            message.red.bold
+        case .debug: message.lightBlack
+        case .info, .default: message
+        case .error: message.red
+        case .fault: message.red.bold
         }
     }
 

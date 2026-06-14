@@ -13,7 +13,7 @@ import Testing
 struct LogParserTests {
     let parser = LogParser()
 
-    @Test("Parse valid NDJSON log entry")
+    @Test
     func parseValidNDJSON() {
         let json = """
         {"timestamp":"2024-01-15T10:30:45.123456Z","processImagePath":"/Applications/Finder.app/Contents/MacOS/Finder","processID":1234,"senderImagePath":"/usr/lib/libnetwork.dylib","subsystem":"com.apple.finder","category":"default","messageType":"Info","eventType":"logEvent","eventMessage":"Test message","source":{"symbol":"-[MyClass doThing]","file":"MyFile.swift","line":42,"image":"MyFramework"}}
@@ -34,7 +34,7 @@ struct LogParserTests {
         #expect(entry?.source == "MyFramework -[MyClass doThing] MyFile.swift:42")
     }
 
-    @Test("Parse log entry with missing optional fields")
+    @Test
     func parseMissingOptionalFields() {
         let json = """
         {"timestamp":"2024-01-15T10:30:45Z","processImagePath":"/usr/bin/test","processID":999,"messageType":"Error","eventMessage":"Error occurred"}
@@ -54,19 +54,19 @@ struct LogParserTests {
         #expect(entry?.processImagePath == "/usr/bin/test")
     }
 
-    @Test("Parse empty line returns nil")
+    @Test
     func parseEmptyLine() {
         let entry = parser.parse(line: "")
         #expect(entry == nil)
     }
 
-    @Test("Parse whitespace-only line returns nil")
+    @Test
     func parseWhitespaceLine() {
         let entry = parser.parse(line: "   \n\t  ")
         #expect(entry == nil)
     }
 
-    @Test("Parse invalid JSON returns nil")
+    @Test
     func parseInvalidJSON() {
         let entry = parser.parse(line: "not valid json {}")
         // May return nil or attempt legacy parsing
@@ -74,7 +74,7 @@ struct LogParserTests {
         _ = entry
     }
 
-    @Test("Parse multiple lines")
+    @Test
     func parseMultipleLines() {
         let json1 = """
         {"timestamp":"2024-01-15T10:30:45Z","processImagePath":"/bin/test1","processID":1,"messageType":"Info","eventMessage":"Message 1"}
@@ -91,7 +91,7 @@ struct LogParserTests {
         #expect(entries[1].processName == "test2")
     }
 
-    @Test("Parse all log levels")
+    @Test
     func parseAllLogLevels() {
         let levels = ["Debug", "Info", "Default", "Error", "Fault"]
         let expectedLevels: [LogLevel] = [.debug, .info, .default, .error, .fault]
@@ -111,7 +111,7 @@ struct LogParserTests {
 
 @Suite("LogLevel Tests")
 struct LogLevelTests {
-    @Test("LogLevel comparison")
+    @Test
     func levelComparison() {
         #expect(LogLevel.debug < LogLevel.info)
         #expect(LogLevel.info < LogLevel.default)
@@ -119,7 +119,7 @@ struct LogLevelTests {
         #expect(LogLevel.error < LogLevel.fault)
     }
 
-    @Test("LogLevel from string")
+    @Test
     func levelFromString() {
         #expect(LogLevel(string: "debug") == .debug)
         #expect(LogLevel(string: "DEBUG") == .debug)

@@ -9,7 +9,7 @@ import Testing
 
 @Suite("StreamConfiguration Tests")
 struct StreamConfigurationTests {
-    @Test("Default configuration has expected values")
+    @Test
     func defaultConfiguration() {
         let config = StreamConfiguration()
 
@@ -20,7 +20,7 @@ struct StreamConfigurationTests {
         #expect(config.includeSource == false)
     }
 
-    @Test("Simulator target stores UDID")
+    @Test
     func simulatorTarget() {
         let config = StreamConfiguration(target: .simulator(udid: "ABC-123"))
 
@@ -31,7 +31,7 @@ struct StreamConfigurationTests {
         }
     }
 
-    @Test("Configurations with same values are equal")
+    @Test
     func equality() {
         let a = StreamConfiguration(
             target: .local,
@@ -54,7 +54,7 @@ struct StreamConfigurationTests {
 struct LogStreamerCommandTests {
     let streamer = LogStreamer()
 
-    @Test("Basic arguments include stream and ndjson style")
+    @Test
     func basicArguments() {
         let config = StreamConfiguration()
         let (_, args) = streamer.buildCommand(for: config)
@@ -64,7 +64,7 @@ struct LogStreamerCommandTests {
         #expect(args[2] == "ndjson")
     }
 
-    @Test("Info flag is included by default")
+    @Test
     func infoFlag() {
         let config = StreamConfiguration(includeInfo: true)
         let (_, args) = streamer.buildCommand(for: config)
@@ -72,7 +72,7 @@ struct LogStreamerCommandTests {
         #expect(args.contains("--info"))
     }
 
-    @Test("No info flag when disabled")
+    @Test
     func noInfoFlag() {
         let config = StreamConfiguration(includeInfo: false)
         let (_, args) = streamer.buildCommand(for: config)
@@ -80,7 +80,7 @@ struct LogStreamerCommandTests {
         #expect(!args.contains("--info"))
     }
 
-    @Test("Debug flag included when set")
+    @Test
     func debugFlag() {
         let config = StreamConfiguration(includeDebug: true)
         let (_, args) = streamer.buildCommand(for: config)
@@ -88,7 +88,7 @@ struct LogStreamerCommandTests {
         #expect(args.contains("--debug"))
     }
 
-    @Test("Source flag included when set")
+    @Test
     func sourceFlag() {
         let config = StreamConfiguration(includeSource: true)
         let (_, args) = streamer.buildCommand(for: config)
@@ -96,7 +96,7 @@ struct LogStreamerCommandTests {
         #expect(args.contains("--source"))
     }
 
-    @Test("No source flag by default")
+    @Test
     func noSourceFlag() {
         let config = StreamConfiguration()
         let (_, args) = streamer.buildCommand(for: config)
@@ -104,7 +104,7 @@ struct LogStreamerCommandTests {
         #expect(!args.contains("--source"))
     }
 
-    @Test("Predicate argument included when set")
+    @Test
     func predicateArg() {
         let config = StreamConfiguration(predicate: "subsystem BEGINSWITH \"com.test\"")
         let (_, args) = streamer.buildCommand(for: config)
@@ -115,7 +115,7 @@ struct LogStreamerCommandTests {
         }
     }
 
-    @Test("Local target uses /usr/bin/log")
+    @Test
     func localTarget() {
         let config = StreamConfiguration(target: .local)
         let (executable, _) = streamer.buildCommand(for: config)
@@ -123,7 +123,7 @@ struct LogStreamerCommandTests {
         #expect("\(executable)".contains("log"))
     }
 
-    @Test("Simulator target uses xcrun simctl spawn")
+    @Test
     func simulatorTarget() {
         let config = StreamConfiguration(target: .simulator(udid: "TEST-UDID"))
         let (executable, args) = streamer.buildCommand(for: config)
@@ -136,7 +136,7 @@ struct LogStreamerCommandTests {
         #expect(args[4] == "stream")
     }
 
-    @Test("Simulator target preserves flags after log command")
+    @Test
     func simulatorPreservesFlags() throws {
         let config = StreamConfiguration(
             target: .simulator(udid: "U"),
@@ -158,7 +158,7 @@ struct LogStreamerCommandTests {
         #expect(afterLog.contains("--predicate"))
     }
 
-    @Test("No debug or info flags when both disabled")
+    @Test
     func noDebugInfoFlags() {
         let config = StreamConfiguration(includeInfo: false, includeDebug: false)
         let (_, args) = streamer.buildCommand(for: config)

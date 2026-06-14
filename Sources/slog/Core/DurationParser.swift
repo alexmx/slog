@@ -15,22 +15,12 @@ enum DurationParser {
         guard let lastChar = trimmed.last else {
             throw ValidationError("\(optionName) cannot be empty")
         }
-        let multiplier: Double
-        let numberString: String
 
-        switch lastChar {
-        case "s", "S":
-            multiplier = 1.0
-            numberString = String(trimmed.dropLast())
-        case "m", "M":
-            multiplier = 60.0
-            numberString = String(trimmed.dropLast())
-        case "h", "H":
-            multiplier = 3600.0
-            numberString = String(trimmed.dropLast())
-        default:
-            multiplier = 1.0
-            numberString = trimmed
+        let (multiplier, numberString): (Double, String) = switch lastChar {
+        case "s", "S": (1, String(trimmed.dropLast()))
+        case "m", "M": (60, String(trimmed.dropLast()))
+        case "h", "H": (3600, String(trimmed.dropLast()))
+        default: (1, trimmed)
         }
 
         guard let value = Double(numberString), value > 0 else {

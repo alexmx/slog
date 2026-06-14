@@ -28,7 +28,7 @@ struct DedupWriterTests {
         )
     }
 
-    @Test("Unique messages are printed individually")
+    @Test
     func uniqueMessages() {
         let writer = DedupWriter(formatter: MessageOnlyFormatter())
 
@@ -40,7 +40,7 @@ struct DedupWriterTests {
         writer.flush()
     }
 
-    @Test("Consecutive identical messages are collapsed")
+    @Test
     func consecutiveIdentical() {
         let writer = DedupWriter(formatter: MessageOnlyFormatter())
 
@@ -51,7 +51,7 @@ struct DedupWriterTests {
         writer.flush()
     }
 
-    @Test("Different message after duplicates triggers flush")
+    @Test
     func differentAfterDuplicates() {
         let writer = DedupWriter(formatter: MessageOnlyFormatter())
 
@@ -61,7 +61,7 @@ struct DedupWriterTests {
         writer.flush()
     }
 
-    @Test("Single message flush does not add count")
+    @Test
     func singleMessage() {
         let writer = DedupWriter(formatter: MessageOnlyFormatter())
 
@@ -69,7 +69,7 @@ struct DedupWriterTests {
         writer.flush()
     }
 
-    @Test("Empty flush is safe")
+    @Test
     func emptyFlush() {
         let writer = DedupWriter(formatter: MessageOnlyFormatter())
         writer.flush()

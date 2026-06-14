@@ -40,7 +40,7 @@ struct FormattedEntryTests {
         )
     }
 
-    @Test("Maps all fields from LogEntry")
+    @Test
     func mapsAllFields() {
         let entry = makeEntry()
         let formatted = FormattedEntry(from: entry)
@@ -61,7 +61,7 @@ struct FormattedEntryTests {
         #expect(formatted.source == "main.swift:42")
     }
 
-    @Test("Handles nil optional fields")
+    @Test
     func handlesNilFields() {
         let entry = makeEntry(
             subsystem: nil, category: nil,
@@ -83,7 +83,7 @@ struct FormattedEntryTests {
         #expect(formatted.source == nil)
     }
 
-    @Test("JSON encoding produces valid JSON")
+    @Test
     func jsonEncoding() throws {
         let entry = makeEntry()
         let formatted = FormattedEntry(from: entry)
@@ -101,7 +101,7 @@ struct FormattedEntryTests {
         #expect(json.contains("\"subsystem\":\"com.test.app\""))
     }
 
-    @Test("JSON encoding omits null fields")
+    @Test
     func jsonEncodingNilFields() throws {
         let entry = makeEntry(
             subsystem: nil, category: nil,
@@ -121,7 +121,7 @@ struct FormattedEntryTests {
         #expect(json.contains("\"pid\":1234"))
     }
 
-    @Test("Level string matches LogLevel rawValue")
+    @Test
     func levelStringMapping() {
         let levels: [(LogLevel, String)] = [
             (.debug, "Debug"),

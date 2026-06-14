@@ -34,7 +34,7 @@ private func makeEntry(
 
 @Suite("PlainFormatter Tests")
 struct PlainFormatterTests {
-    @Test("Full output includes all components")
+    @Test
     func fullOutput() {
         let formatter = PlainFormatter()
         let output = formatter.format(makeEntry())
@@ -45,7 +45,7 @@ struct PlainFormatterTests {
         #expect(output.contains("Hello world"))
     }
 
-    @Test("Subsystem without category shows subsystem only")
+    @Test
     func subsystemWithoutCategory() {
         let formatter = PlainFormatter()
         let output = formatter.format(makeEntry(category: nil))
@@ -54,7 +54,7 @@ struct PlainFormatterTests {
         #expect(!output.contains("(com.test.app:general)"))
     }
 
-    @Test("No subsystem omits subsystem component")
+    @Test
     func noSubsystem() {
         let formatter = PlainFormatter()
         let output = formatter.format(makeEntry(subsystem: nil, category: nil))
@@ -64,7 +64,7 @@ struct PlainFormatterTests {
         #expect(output.contains("Hello world"))
     }
 
-    @Test("Hide timestamp removes timestamp")
+    @Test
     func hideTimestamp() {
         let formatter = PlainFormatter(showTimestamp: false)
         let output = formatter.format(makeEntry())
@@ -73,7 +73,7 @@ struct PlainFormatterTests {
         #expect(output.hasPrefix("[INFO]"))
     }
 
-    @Test("Hide process removes process info")
+    @Test
     func hideProcess() {
         let formatter = PlainFormatter(showProcess: false)
         let output = formatter.format(makeEntry())
@@ -83,7 +83,6 @@ struct PlainFormatterTests {
     }
 
     @Test(
-        "All log levels produce correct labels",
         arguments: [
             (LogLevel.debug, "DEBUG"),
             (LogLevel.info, "INFO"),
@@ -104,7 +103,7 @@ struct PlainFormatterTests {
 
 @Suite("ColorFormatter Tests")
 struct ColorFormatterTests {
-    @Test("Output includes process and message")
+    @Test
     func includesComponents() {
         let formatter = ColorFormatter()
         let output = formatter.format(makeEntry())
@@ -115,7 +114,7 @@ struct ColorFormatterTests {
         #expect(output.contains("Hello world"))
     }
 
-    @Test("Compact mode hides process and subsystem")
+    @Test
     func compactMode() {
         let formatter = ColorFormatter(
             showProcess: false,
@@ -128,7 +127,7 @@ struct ColorFormatterTests {
         #expect(output.contains("Hello world"))
     }
 
-    @Test("Error level colors message red")
+    @Test
     func errorLevelColors() {
         let formatter = ColorFormatter()
         let output = formatter.format(makeEntry(level: .error))
@@ -138,7 +137,7 @@ struct ColorFormatterTests {
         #expect(output != infoOutput)
     }
 
-    @Test("Highlight pattern is stored and used")
+    @Test
     func highlightPattern() {
         let formatter = ColorFormatter(highlightPattern: "world")
         let output = formatter.format(makeEntry())
@@ -151,7 +150,7 @@ struct ColorFormatterTests {
         #expect(!output.isEmpty)
     }
 
-    @Test("No subsystem omits subsystem from output")
+    @Test
     func noSubsystem() {
         let formatter = ColorFormatter()
         let withSub = formatter.format(makeEntry(subsystem: "com.test"))
@@ -165,7 +164,7 @@ struct ColorFormatterTests {
 
 @Suite("JSONFormatter Tests")
 struct JSONFormatterTests {
-    @Test("Output is valid JSON")
+    @Test
     func validJSON() throws {
         let formatter = JSONFormatter()
         let output = formatter.format(makeEntry())
@@ -182,7 +181,7 @@ struct JSONFormatterTests {
         #expect(parsed?["category"] as? String == "general")
     }
 
-    @Test("Nil fields are null in JSON")
+    @Test
     func nilFieldsAreNull() throws {
         let formatter = JSONFormatter()
         let output = formatter.format(makeEntry(subsystem: nil, category: nil))
@@ -195,7 +194,7 @@ struct JSONFormatterTests {
         #expect(parsed?["subsystem"] is NSNull || parsed?["subsystem"] == nil)
     }
 
-    @Test("Pretty mode produces multi-line output")
+    @Test
     func prettyMode() {
         let formatter = JSONFormatter(pretty: true)
         let output = formatter.format(makeEntry())
@@ -203,7 +202,7 @@ struct JSONFormatterTests {
         #expect(output.contains("\n"))
     }
 
-    @Test("Compact mode produces single-line output")
+    @Test
     func compactMode() {
         let formatter = JSONFormatter(pretty: false)
         let output = formatter.format(makeEntry())
@@ -211,7 +210,7 @@ struct JSONFormatterTests {
         #expect(!output.contains("\n"))
     }
 
-    @Test("Keys are sorted")
+    @Test
     func sortedKeys() throws {
         let formatter = JSONFormatter()
         let output = formatter.format(makeEntry())
@@ -222,7 +221,7 @@ struct JSONFormatterTests {
         #expect(categoryIdx < levelIdx)
     }
 
-    @Test("Special characters in message are properly escaped")
+    @Test
     func specialCharacters() throws {
         let formatter = JSONFormatter()
         let output = formatter.format(makeEntry(message: "line1\nline2\ttab"))
@@ -234,7 +233,6 @@ struct JSONFormatterTests {
     }
 
     @Test(
-        "All log levels produce correct level strings",
         arguments: [
             (LogLevel.debug, "Debug"),
             (LogLevel.info, "Info"),
@@ -258,7 +256,7 @@ struct JSONFormatterTests {
 
 @Suite("ToonFormatter Tests")
 struct ToonFormatterTests {
-    @Test("Output is non-empty")
+    @Test
     func nonEmpty() {
         let formatter = ToonFormatter()
         let output = formatter.format(makeEntry())
@@ -266,7 +264,7 @@ struct ToonFormatterTests {
         #expect(!output.isEmpty)
     }
 
-    @Test("Output contains key fields")
+    @Test
     func containsFields() {
         let formatter = ToonFormatter()
         let output = formatter.format(makeEntry())
@@ -276,7 +274,7 @@ struct ToonFormatterTests {
         #expect(output.contains("Hello world"))
     }
 
-    @Test("Different levels produce different output")
+    @Test
     func differentLevels() {
         let formatter = ToonFormatter()
         let errorOutput = formatter.format(makeEntry(level: .error))
@@ -290,31 +288,31 @@ struct ToonFormatterTests {
 
 @Suite("FormatterRegistry Tests")
 struct FormatterRegistryTests {
-    @Test("Plain format returns PlainFormatter")
+    @Test
     func plainFormat() {
         let formatter = FormatterRegistry.formatter(for: .plain)
         #expect(formatter is PlainFormatter)
     }
 
-    @Test("Color format returns ColorFormatter")
+    @Test
     func colorFormat() {
         let formatter = FormatterRegistry.formatter(for: .color)
         #expect(formatter is ColorFormatter)
     }
 
-    @Test("Compact format returns ColorFormatter")
+    @Test
     func compactFormat() {
         let formatter = FormatterRegistry.formatter(for: .compact)
         #expect(formatter is ColorFormatter)
     }
 
-    @Test("JSON format returns JSONFormatter")
+    @Test
     func jsonFormat() {
         let formatter = FormatterRegistry.formatter(for: .json)
         #expect(formatter is JSONFormatter)
     }
 
-    @Test("Toon format returns ToonFormatter")
+    @Test
     func toonFormat() {
         let formatter = FormatterRegistry.formatter(for: .toon)
         #expect(formatter is ToonFormatter)

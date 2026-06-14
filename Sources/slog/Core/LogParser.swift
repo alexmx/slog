@@ -54,15 +54,12 @@ public struct LogParser: Sendable {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        guard let data = trimmed.data(using: .utf8) else { return nil }
-
-        do {
-            let rawEntry = try decoder.decode(RawLogEntry.self, from: data)
+        let data = Data(trimmed.utf8)
+        if let rawEntry = try? decoder.decode(RawLogEntry.self, from: data) {
             return rawEntry.toLogEntry()
-        } catch {
-            // Try parsing as legacy format if JSON fails
-            return parseLegacyFormat(line: trimmed)
         }
+        // Fall back to legacy format if JSON fails
+        return parseLegacyFormat(line: trimmed)
     }
 
     /// Parse multiple lines (e.g., from a buffer)
@@ -188,23 +185,15 @@ private struct RawLogEntry: Decodable {
     let processImagePath: String?
     let processID: Int?
     let senderImagePath: String?
-    let senderProgramCounter: Int?
-    let machTimestamp: Int?
     let subsystem: String?
     let category: String?
     let messageType: String?
     let eventType: String?
     let eventMessage: String?
     let activityIdentifier: Int?
-    let parentActivityIdentifier: Int?
     let threadID: Int?
     let traceID: Int?
-    let processUniqueID: Int?
-    let processImageUUID: String?
-    let senderImageUUID: String?
-    let creatorActivityID: Int?
     let source: SourceInfo?
-    let backtrace: BacktraceInfo?
 
     struct SourceInfo: Decodable {
         let symbol: String?
@@ -233,15 +222,6 @@ private struct RawLogEntry: Decodable {
             }
 
             return parts.isEmpty ? nil : parts.joined(separator: " ")
-        }
-    }
-
-    struct BacktraceInfo: Decodable {
-        let frames: [FrameInfo]?
-
-        struct FrameInfo: Decodable {
-            let imageOffset: Int?
-            let imageUUID: String?
         }
     }
 

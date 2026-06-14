@@ -197,14 +197,6 @@ public struct PredicateBuilder: Sendable {
         components.append("messageType >= \(levelValue)")
     }
 
-    /// Filter by message content (contains)
-    public mutating func messageContains(_ text: String) {
-        let escaped = text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        components.append("eventMessage CONTAINS \"\(escaped)\"")
-    }
-
     /// Build the final predicate string
     public func build() -> String? {
         guard !components.isEmpty else { return nil }

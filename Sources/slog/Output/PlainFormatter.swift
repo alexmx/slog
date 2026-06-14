@@ -37,8 +37,7 @@ public struct PlainFormatter: LogFormatter {
         }
 
         if showLevel {
-            let levelStr = levelString(entry.level)
-            components.append("[\(levelStr)]")
+            components.append("[\(entry.level.rawValue.uppercased())]")
         }
 
         if showProcess {
@@ -56,20 +55,5 @@ public struct PlainFormatter: LogFormatter {
         components.append(entry.message)
 
         return components.joined(separator: " ")
-    }
-
-    private func levelString(_ level: LogLevel) -> String {
-        switch level {
-        case .debug:
-            "DEBUG"
-        case .info:
-            "INFO"
-        case .default:
-            "DEFAULT"
-        case .error:
-            "ERROR"
-        case .fault:
-            "FAULT"
-        }
     }
 }

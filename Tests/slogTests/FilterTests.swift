@@ -31,7 +31,7 @@ struct FilterPredicateTests {
         )
     }
 
-    @Test("ProcessNamePredicate matches process name case-insensitively")
+    @Test
     func processNamePredicate() {
         let predicate = ProcessNamePredicate(processName: "testapp")
         let entry = makeEntry(processName: "TestApp")
@@ -39,7 +39,7 @@ struct FilterPredicateTests {
         #expect(predicate.matches(entry) == true)
     }
 
-    @Test("ProcessNamePredicate case-sensitive matching")
+    @Test
     func processNamePredicateCaseSensitive() {
         let predicate = ProcessNamePredicate(processName: "TestApp", caseSensitive: true)
 
@@ -47,7 +47,7 @@ struct FilterPredicateTests {
         #expect(predicate.matches(makeEntry(processName: "testapp")) == false)
     }
 
-    @Test("ProcessIDPredicate matches PID")
+    @Test
     func processIDPredicate() {
         let predicate = ProcessIDPredicate(pid: 1234)
 
@@ -55,7 +55,7 @@ struct FilterPredicateTests {
         #expect(predicate.matches(makeEntry(pid: 5678)) == false)
     }
 
-    @Test("SubsystemPredicate matches exact subsystem")
+    @Test
     func subsystemPredicateExact() {
         let predicate = SubsystemPredicate(subsystem: "com.test.app")
 
@@ -64,7 +64,7 @@ struct FilterPredicateTests {
         #expect(predicate.matches(makeEntry(subsystem: nil)) == false)
     }
 
-    @Test("SubsystemPredicate matches prefix")
+    @Test
     func subsystemPredicatePrefix() {
         let predicate = SubsystemPredicate(subsystem: "com.test", matchPrefix: true)
 
@@ -73,7 +73,7 @@ struct FilterPredicateTests {
         #expect(predicate.matches(makeEntry(subsystem: "com.other")) == false)
     }
 
-    @Test("MinimumLevelPredicate filters by level")
+    @Test
     func minimumLevelPredicate() {
         let predicate = MinimumLevelPredicate(minimumLevel: .error)
 
@@ -84,16 +84,7 @@ struct FilterPredicateTests {
         #expect(predicate.matches(makeEntry(level: .fault)) == true)
     }
 
-    @Test("MessageContainsPredicate matches substring")
-    func messageContainsPredicate() {
-        let predicate = MessageContainsPredicate(substring: "error")
-
-        #expect(predicate.matches(makeEntry(message: "An error occurred")) == true)
-        #expect(predicate.matches(makeEntry(message: "An ERROR occurred")) == true)
-        #expect(predicate.matches(makeEntry(message: "Success")) == false)
-    }
-
-    @Test("MessageRegexPredicate matches pattern")
+    @Test
     func messageRegexPredicate() throws {
         let predicate = try MessageRegexPredicate(pattern: "error.*timeout")
 
@@ -123,7 +114,7 @@ struct FilterChainTests {
         )
     }
 
-    @Test("Empty filter chain matches all entries")
+    @Test
     func emptyChainMatchesAll() {
         let chain = FilterChain()
         let entry = makeEntry()
@@ -132,7 +123,7 @@ struct FilterChainTests {
         #expect(chain.matches(entry) == true)
     }
 
-    @Test("Filter chain combines predicates with AND logic")
+    @Test
     func chainCombinesWithAnd() {
         var chain = FilterChain()
         chain.process("TestApp")
@@ -143,7 +134,7 @@ struct FilterChainTests {
         #expect(chain.matches(makeEntry(processName: "OtherApp", level: .error)) == false)
     }
 
-    @Test("Filter chain fluent builder")
+    @Test
     func chainBuilder() {
         var chain = FilterChain()
         chain.process("MyApp")
@@ -165,7 +156,7 @@ struct FilterChainTests {
         #expect(chain.matches(matchingEntry) == true)
     }
 
-    @Test("Filter chain filters array of entries")
+    @Test
     func chainFiltersArray() {
         var chain = FilterChain()
         chain.minimumLevel(.error)
@@ -199,36 +190,12 @@ struct CompositePredicateTests {
         )
     }
 
-    @Test("AllOfPredicate requires all to match")
-    func allOfPredicate() {
-        let predicate = AllOfPredicate(predicates: [
-            MinimumLevelPredicate(minimumLevel: .error),
-            MessageContainsPredicate(substring: "critical")
-        ])
-
-        #expect(predicate.matches(makeEntry(level: .error, message: "critical error")) == true)
-        #expect(predicate.matches(makeEntry(level: .error, message: "normal error")) == false)
-        #expect(predicate.matches(makeEntry(level: .info, message: "critical info")) == false)
-    }
-
-    @Test("AnyOfPredicate requires any to match")
-    func anyOfPredicate() {
-        let predicate = AnyOfPredicate(predicates: [
-            ExactLevelPredicate(level: .error),
-            ExactLevelPredicate(level: .fault)
-        ])
-
-        #expect(predicate.matches(makeEntry(level: .error)) == true)
-        #expect(predicate.matches(makeEntry(level: .fault)) == true)
-        #expect(predicate.matches(makeEntry(level: .info)) == false)
-    }
-
-    @Test("NotPredicate inverts result")
+    @Test
     func notPredicate() {
-        let predicate = NotPredicate(ExactLevelPredicate(level: .debug))
+        let predicate = NotPredicate(MinimumLevelPredicate(minimumLevel: .error))
 
-        #expect(predicate.matches(makeEntry(level: .debug)) == false)
+        #expect(predicate.matches(makeEntry(level: .error)) == false)
+        #expect(predicate.matches(makeEntry(level: .fault)) == false)
         #expect(predicate.matches(makeEntry(level: .info)) == true)
-        #expect(predicate.matches(makeEntry(level: .error)) == true)
     }
 }

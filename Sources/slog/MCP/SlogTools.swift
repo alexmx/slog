@@ -6,7 +6,7 @@
 import Foundation
 import SwiftMCP
 
-// Thread-safe sendable one-shot flag
+/// Thread-safe sendable one-shot flag
 final class SendableBoolFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var value = false
@@ -24,7 +24,7 @@ final class SendableBoolFlag: @unchecked Sendable {
     }
 }
 
-// Thread-safe sendable container for collecting log entries
+/// Thread-safe sendable container for collecting log entries
 class SendableEntryContainer: @unchecked Sendable {
     private let lock = NSLock()
     private var _entries: [LogEntry] = []
@@ -99,23 +99,17 @@ enum SlogTools {
 
     private static func json(_ value: some Encodable) throws -> MCPToolResult {
         let data = try encoder.encode(value)
-        guard let string = String(data: data, encoding: .utf8) else {
-            return .text("{\"error\":\"Failed to encode result\"}")
-        }
-        return .text(string)
+        return .text(String(decoding: data, as: UTF8.self))
     }
 
     /// `{ "error": "<message>" }` payload for tool failures. Uses the same
     /// encoder as `json` so escaping (quotes, backslashes, newlines, unicode)
     /// stays consistent with success responses.
     private static func errorJSON(_ message: String) -> MCPToolResult {
-        guard
-            let data = try? encoder.encode(["error": message]),
-            let string = String(data: data, encoding: .utf8)
-        else {
+        guard let data = try? encoder.encode(["error": message]) else {
             return .text("{\"error\":\"Failed to encode error\"}")
         }
-        return .text(string)
+        return .text(String(decoding: data, as: UTF8.self))
     }
 
     /// Outcome of `buildFilterSetup`: the parsed setup or a ready-to-return
@@ -155,7 +149,6 @@ enum SlogTools {
         }
     }
 
-
     // MARK: - Argument Types
 
     struct ShowArgs: MCPToolInput {
@@ -165,19 +158,27 @@ enum SlogTools {
         @InputProperty("Start date for custom range (e.g. '2024-01-15 10:30:00'). Use with 'end' instead of 'last'.")
         var start: String?
 
-        @InputProperty("End date for custom range (e.g. '2024-01-15 11:00:00'). Optional — omit to query from start to now.")
+        @InputProperty(
+            "End date for custom range (e.g. '2024-01-15 11:00:00'). Optional — omit to query from start to now."
+        )
         var end: String?
 
-        @InputProperty("Filter by process name(s) — array, OR-matched (use slog_list_processes to discover names). Example: [\"Finder\", \"Dock\"].")
+        @InputProperty(
+            "Filter by process name(s) — array, OR-matched (use slog_list_processes to discover names). Example: [\"Finder\", \"Dock\"]."
+        )
         var process: [String]?
 
         @InputProperty("Filter by process ID")
         var pid: Int?
 
-        @InputProperty("Filter by subsystem(s) — array, OR-matched (e.g. [\"com.apple.network\"]). Automatically includes debug logs.")
+        @InputProperty(
+            "Filter by subsystem(s) — array, OR-matched (e.g. [\"com.apple.network\"]). Automatically includes debug logs."
+        )
         var subsystem: [String]?
 
-        @InputProperty("Filter by category(ies) — array, OR-matched (use with subsystem for precise filtering). Example: [\"http\", \"dns\"].")
+        @InputProperty(
+            "Filter by category(ies) — array, OR-matched (use with subsystem for precise filtering). Example: [\"http\", \"dns\"]."
+        )
         var category: [String]?
 
         @InputProperty("Minimum log level: debug, info, default, error, fault. Narrows results when too many entries.")
@@ -197,16 +198,22 @@ enum SlogTools {
     }
 
     struct StreamArgs: MCPToolInput {
-        @InputProperty("Filter by process name(s) — array, OR-matched (use slog_list_processes to discover names). Example: [\"Finder\", \"Dock\"].")
+        @InputProperty(
+            "Filter by process name(s) — array, OR-matched (use slog_list_processes to discover names). Example: [\"Finder\", \"Dock\"]."
+        )
         var process: [String]?
 
         @InputProperty("Filter by process ID")
         var pid: Int?
 
-        @InputProperty("Filter by subsystem(s) — array, OR-matched (e.g. [\"com.apple.network\"]). Automatically includes debug logs.")
+        @InputProperty(
+            "Filter by subsystem(s) — array, OR-matched (e.g. [\"com.apple.network\"]). Automatically includes debug logs."
+        )
         var subsystem: [String]?
 
-        @InputProperty("Filter by category(ies) — array, OR-matched (use with subsystem for precise filtering). Example: [\"http\", \"dns\"].")
+        @InputProperty(
+            "Filter by category(ies) — array, OR-matched (use with subsystem for precise filtering). Example: [\"http\", \"dns\"]."
+        )
         var category: [String]?
 
         @InputProperty("Minimum log level: debug, info, default, error, fault. Narrows results when too many entries.")
@@ -221,7 +228,9 @@ enum SlogTools {
         @InputProperty("Number of entries to capture (required, max 1000). Controls how long the stream runs.")
         var count: Int
 
-        @InputProperty("Maximum time to wait in seconds (default: 30). Stream returns collected entries when timeout is reached, even if count hasn't been met.")
+        @InputProperty(
+            "Maximum time to wait in seconds (default: 30). Stream returns collected entries when timeout is reached, even if count hasn't been met."
+        )
         var timeout: Int?
 
         @InputProperty("Stream from iOS Simulator instead of host (use slog_list_simulators to find devices)")
@@ -251,16 +260,16 @@ enum SlogTools {
         description: """
         Query historical/persisted macOS logs. **Use this for post-mortem analysis** — \
         investigating what happened in the recent past.
-
+        
         Requires one time source: `last` ('5m', '1h', 'boot'), `start`/`end` date range, \
         or `archive_path`. Start with broad filters (process only), then narrow with \
         subsystem/level/grep. Filtering by `subsystem` auto-includes debug+info; \
         otherwise only default+ levels are returned.
-
+        
         Returns `{ entries, count, elapsed_ms, hint? }`. The optional `hint` appears \
         only when `count == 0` and explains the most likely cause (e.g. custom-subsystem \
         debug persistence, process-only query, time window too short).
-
+        
         **Note on debug events:** Custom (non-Apple) subsystems do not persist debug-level \
         events by default — `log show` cannot replay them after the fact, even with --debug. \
         If you see 0 results from a subsystem you know is logging, use `slog_stream` for \
@@ -369,12 +378,12 @@ enum SlogTools {
         Stream live macOS/iOS logs with bounded capture. **Use this for real-time debugging** \
         and for capturing debug events from your own app's subsystem (which `slog_show` cannot \
         see unless persistence was pre-enabled).
-
+        
         `count` is required and must be 1–1000; the call returns as soon as that many entries \
         match, or `timeout` seconds pass (default 30s), whichever comes first. Start with broad \
         filters (process only), then narrow with subsystem/level/grep. Filtering by `subsystem` \
         auto-includes debug+info. iOS Simulator capture via `simulator: true`.
-
+        
         Returns `{ entries, captured, requested, stopped_by, elapsed_ms }`. `stopped_by`:
           - "count"     — reached `requested` entries (success path)
           - "timeout"   — hit `timeout` seconds without enough matches
@@ -388,7 +397,9 @@ enum SlogTools {
             return errorJSON("'count' must be a positive integer")
         }
         guard args.count <= 1000 else {
-            return errorJSON("'count' must be <= 1000 (got \(args.count)). Use a smaller window or run multiple streams.")
+            return errorJSON(
+                "'count' must be <= 1000 (got \(args.count)). Use a smaller window or run multiple streams."
+            )
         }
         let count = args.count
 
@@ -452,7 +463,7 @@ enum SlogTools {
 
         let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
         let captured = container.count
-        let stoppedBy: String = if timedOut.get() {
+        let stoppedBy = if timedOut.get() {
             "timeout"
         } else if case .failure = streamResult {
             "error"

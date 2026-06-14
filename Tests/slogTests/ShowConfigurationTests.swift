@@ -9,7 +9,7 @@ import Testing
 
 @Suite("ShowConfiguration Tests")
 struct ShowConfigurationTests {
-    @Test("Default configuration has expected values")
+    @Test
     func defaultConfiguration() {
         let config = ShowConfiguration()
 
@@ -20,7 +20,7 @@ struct ShowConfigurationTests {
         #expect(config.includeDebug == false)
     }
 
-    @Test("Configuration with last duration")
+    @Test
     func lastDuration() {
         let config = ShowConfiguration(timeRange: .last("5m"))
 
@@ -31,7 +31,7 @@ struct ShowConfigurationTests {
         }
     }
 
-    @Test("Configuration with last boot")
+    @Test
     func lastBoot() {
         let config = ShowConfiguration(timeRange: .lastBoot)
 
@@ -42,7 +42,7 @@ struct ShowConfigurationTests {
         }
     }
 
-    @Test("Configuration with date range")
+    @Test
     func dateRange() {
         let config = ShowConfiguration(
             timeRange: .range(start: "2024-01-15 10:00:00", end: "2024-01-15 11:00:00")
@@ -56,7 +56,7 @@ struct ShowConfigurationTests {
         }
     }
 
-    @Test("Configuration with archive path")
+    @Test
     func archivePath() {
         let config = ShowConfiguration(archivePath: "/tmp/test.logarchive")
 
@@ -68,7 +68,7 @@ struct ShowConfigurationTests {
 struct LogReaderCommandTests {
     let reader = LogReader()
 
-    @Test("Basic arguments include show and ndjson style")
+    @Test
     func basicArguments() {
         let config = ShowConfiguration()
         let args = reader.buildArguments(for: config)
@@ -78,7 +78,7 @@ struct LogReaderCommandTests {
         #expect(args[2] == "ndjson")
     }
 
-    @Test("Info flag is included by default")
+    @Test
     func infoFlag() {
         let config = ShowConfiguration(includeInfo: true)
         let args = reader.buildArguments(for: config)
@@ -86,7 +86,7 @@ struct LogReaderCommandTests {
         #expect(args.contains("--info"))
     }
 
-    @Test("Debug flag included when set")
+    @Test
     func debugFlag() {
         let config = ShowConfiguration(includeDebug: true)
         let args = reader.buildArguments(for: config)
@@ -94,7 +94,7 @@ struct LogReaderCommandTests {
         #expect(args.contains("--debug"))
     }
 
-    @Test("Last duration argument")
+    @Test
     func lastDurationArg() {
         let config = ShowConfiguration(timeRange: .last("5m"))
         let args = reader.buildArguments(for: config)
@@ -105,7 +105,7 @@ struct LogReaderCommandTests {
         }
     }
 
-    @Test("Last boot argument")
+    @Test
     func lastBootArg() {
         let config = ShowConfiguration(timeRange: .lastBoot)
         let args = reader.buildArguments(for: config)
@@ -116,7 +116,7 @@ struct LogReaderCommandTests {
         }
     }
 
-    @Test("Start and end date arguments")
+    @Test
     func startEndArgs() {
         let config = ShowConfiguration(
             timeRange: .range(start: "2024-01-15 10:00:00", end: "2024-01-15 11:00:00")
@@ -133,7 +133,7 @@ struct LogReaderCommandTests {
         }
     }
 
-    @Test("Predicate argument")
+    @Test
     func predicateArg() {
         let config = ShowConfiguration(predicate: "processImagePath ENDSWITH \"/Finder\"")
         let args = reader.buildArguments(for: config)
@@ -144,7 +144,7 @@ struct LogReaderCommandTests {
         }
     }
 
-    @Test("Archive path is last argument")
+    @Test
     func archivePathArg() {
         let config = ShowConfiguration(
             timeRange: .last("1m"),
@@ -155,7 +155,7 @@ struct LogReaderCommandTests {
         #expect(args.last == "/tmp/test.logarchive")
     }
 
-    @Test("No info or debug flags when disabled")
+    @Test
     func noInfoDebugFlags() {
         let config = ShowConfiguration(includeInfo: false, includeDebug: false)
         let args = reader.buildArguments(for: config)

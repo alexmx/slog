@@ -139,12 +139,10 @@ public enum SystemQuery {
             throw StreamError.simulatorNotFound("Could not parse simulator list")
         }
 
-        for (_, deviceList) in devices {
-            for device in deviceList {
-                if let state = device["state"] as? String, state == "Booted",
-                   let udid = device["udid"] as? String {
-                    return udid
-                }
+        for device in devices.values.flatMap({ $0 }) {
+            if device["state"] as? String == "Booted",
+               let udid = device["udid"] as? String {
+                return udid
             }
         }
 

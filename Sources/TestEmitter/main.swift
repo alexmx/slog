@@ -55,7 +55,8 @@ func emitTestLogs(batch: Int) {
     networkLogger.log("\(prefix, privacy: .public)POST /api/v1/orders -> 201 Created (128ms)")
     networkLogger.log("\(prefix, privacy: .public)GET /api/v1/health -> 200 OK (2ms)")
     databaseLogger.log("\(prefix, privacy: .public)SELECT * FROM users WHERE id=42 -- 1 row (0.3ms)")
-    databaseLogger.log("\(prefix, privacy: .public)INSERT INTO audit_log (action, user_id) VALUES ('login', 42) -- 1 row (1.2ms)")
+    databaseLogger
+        .log("\(prefix, privacy: .public)INSERT INTO audit_log (action, user_id) VALUES ('login', 42) -- 1 row (1.2ms)")
 
     // Messages with unicode and special characters
     defaultLogger.log("\(prefix, privacy: .public)User 'José García' logged in from São Paulo")

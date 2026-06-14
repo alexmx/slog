@@ -16,52 +16,11 @@ public struct JSONFormatter: LogFormatter {
     }
 
     public func format(_ entry: LogEntry) -> String {
-        let output = FormattedEntry(from: entry)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = pretty ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
 
-        do {
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            if pretty {
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            } else {
-                encoder.outputFormatting = [.sortedKeys]
-            }
-            let data = try encoder.encode(output)
-            return String(data: data, encoding: .utf8) ?? "{}"
-        } catch {
-            // Fallback to manual JSON construction
-            return fallbackJSON(entry)
-        }
-    }
-
-    private func fallbackJSON(_ entry: LogEntry) -> String {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let timestamp = isoFormatter.string(from: entry.timestamp)
-
-        let escapedMessage = entry.message
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
-            .replacingOccurrences(of: "\t", with: "\\t")
-
-        var json = "{"
-        json += "\"timestamp\":\"\(timestamp)\","
-        json += "\"process\":\"\(entry.processName)\","
-        json += "\"pid\":\(entry.pid),"
-        json += "\"level\":\"\(entry.level.rawValue)\","
-        json += "\"message\":\"\(escapedMessage)\""
-
-        if let subsystem = entry.subsystem {
-            json += ",\"subsystem\":\"\(subsystem)\""
-        }
-
-        if let category = entry.category {
-            json += ",\"category\":\"\(category)\""
-        }
-
-        json += "}"
-        return json
+        let data = (try? encoder.encode(FormattedEntry(from: entry))) ?? Data()
+        return String(data: data, encoding: .utf8) ?? "{}"
     }
 }

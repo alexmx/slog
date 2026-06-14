@@ -36,7 +36,10 @@ struct StreamCommand: AsyncParsableCommand {
 
     // MARK: - Filter Options
 
-    @Option(name: .long, help: "Filter by subsystem (comma-separated for multiple, e.g. com.apple.network,com.apple.CFNetwork)")
+    @Option(
+        name: .long,
+        help: "Filter by subsystem (comma-separated for multiple, e.g. com.apple.network,com.apple.CFNetwork)"
+    )
     var subsystem: String?
 
     @Option(name: .long, help: "Filter by category (comma-separated for multiple, e.g. http,dns)")

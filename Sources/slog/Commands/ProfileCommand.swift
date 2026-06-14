@@ -61,11 +61,7 @@ struct ShowProfile: ParsableCommand {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(profile)
 
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw ProfileError.invalidProfile("Could not encode profile")
-        }
-
-        print(json)
+        print(String(decoding: data, as: UTF8.self))
     }
 }
 
