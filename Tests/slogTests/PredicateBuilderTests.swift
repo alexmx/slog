@@ -14,10 +14,29 @@ struct PredicateBuilderTests {
     @Test("Process predicate uses ENDSWITH")
     func processFilter() {
         var builder = PredicateBuilder()
-        builder.process("Finder")
+        builder.processes(["Finder"])
         let predicate = builder.build()
 
         #expect(predicate == "processImagePath ENDSWITH \"/Finder\"")
+    }
+
+    @Test("Multiple processes OR-grouped")
+    func multipleProcesses() {
+        var builder = PredicateBuilder()
+        builder.processes(["Finder", "Dock"])
+        let predicate = builder.build()
+
+        #expect(predicate == "(processImagePath ENDSWITH \"/Finder\" OR processImagePath ENDSWITH \"/Dock\")")
+    }
+
+    @Test("Empty processes array contributes no component")
+    func emptyProcesses() {
+        var builder = PredicateBuilder()
+        builder.processes([])
+        builder.pid(42)
+        let predicate = builder.build()
+
+        #expect(predicate == "processID == 42")
     }
 
     @Test("PID predicate uses equality")
@@ -29,22 +48,40 @@ struct PredicateBuilderTests {
         #expect(predicate == "processID == 1234")
     }
 
-    @Test("Subsystem predicate uses equality")
+    @Test("Subsystem predicate uses BEGINSWITH")
     func subsystemFilter() {
         var builder = PredicateBuilder()
-        builder.subsystem("com.apple.network")
+        builder.subsystems(["com.apple.network"])
         let predicate = builder.build()
 
         #expect(predicate == "subsystem BEGINSWITH \"com.apple.network\"")
     }
 
+    @Test("Multiple subsystems OR-grouped")
+    func multipleSubsystems() {
+        var builder = PredicateBuilder()
+        builder.subsystems(["com.apple.network", "com.apple.CFNetwork"])
+        let predicate = builder.build()
+
+        #expect(predicate == "(subsystem BEGINSWITH \"com.apple.network\" OR subsystem BEGINSWITH \"com.apple.CFNetwork\")")
+    }
+
     @Test("Category predicate uses equality")
     func categoryFilter() {
         var builder = PredicateBuilder()
-        builder.category("http")
+        builder.categories(["http"])
         let predicate = builder.build()
 
         #expect(predicate == "category == \"http\"")
+    }
+
+    @Test("Multiple categories OR-grouped")
+    func multipleCategories() {
+        var builder = PredicateBuilder()
+        builder.categories(["http", "dns"])
+        let predicate = builder.build()
+
+        #expect(predicate == "(category == \"http\" OR category == \"dns\")")
     }
 
     @Test(
@@ -97,8 +134,8 @@ struct PredicateBuilderTests {
     @Test("Multiple predicates joined with AND")
     func multiplePredicates() {
         var builder = PredicateBuilder()
-        builder.process("MyApp")
-        builder.subsystem("com.my.app")
+        builder.processes(["MyApp"])
+        builder.subsystems(["com.my.app"])
         let predicate = builder.build()
 
         #expect(predicate?.contains(" AND ") == true)
@@ -119,10 +156,10 @@ struct PredicateBuilderTests {
     @Test("buildPredicate with all parameters")
     func buildPredicateAllParams() throws {
         let predicate = PredicateBuilder.buildPredicate(
-            process: "MyApp",
+            processes: ["MyApp"],
             pid: 42,
-            subsystem: "com.my.app",
-            category: "net",
+            subsystems: ["com.my.app"],
+            categories: ["net"],
             level: .error
         )
 
@@ -143,9 +180,20 @@ struct PredicateBuilderTests {
 
     @Test("buildPredicate with single parameter")
     func buildPredicateSingle() {
-        let predicate = PredicateBuilder.buildPredicate(subsystem: "com.apple.network")
+        let predicate = PredicateBuilder.buildPredicate(subsystems: ["com.apple.network"])
 
         #expect(predicate == "subsystem BEGINSWITH \"com.apple.network\"")
         #expect(predicate?.contains(" AND ") == false)
+    }
+
+    @Test("buildPredicate OR-groups multiple subsystems and ANDs with category")
+    func buildPredicateMultipleSubsystemsWithCategory() throws {
+        let predicate = PredicateBuilder.buildPredicate(
+            subsystems: ["com.apple.network", "com.apple.CFNetwork"],
+            categories: ["http"]
+        )
+
+        let expected = "(subsystem BEGINSWITH \"com.apple.network\" OR subsystem BEGINSWITH \"com.apple.CFNetwork\") AND category == \"http\""
+        #expect(predicate == expected)
     }
 }

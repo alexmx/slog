@@ -89,7 +89,7 @@ slog stream --process MyApp --count 10
 
 | Option | Description |
 |--------|-------------|
-| `--process <name>` | Filter by process name |
+| `--process <name>` | Filter by process name. Comma-separated for multiple (OR-matched), e.g. `Finder,Dock` |
 | `--pid <id>` | Filter by process ID |
 | `--simulator` | Stream from iOS Simulator instead of macOS |
 | `--simulator-udid <udid>` | Specific simulator UDID (auto-detects if omitted) |
@@ -98,8 +98,8 @@ slog stream --process MyApp --count 10
 
 | Option | Description |
 |--------|-------------|
-| `--subsystem <name>` | Filter by subsystem (e.g., `com.apple.network`) |
-| `--category <name>` | Filter by category |
+| `--subsystem <name>` | Filter by subsystem (e.g., `com.apple.network`). Comma-separated for multiple (OR-matched) |
+| `--category <name>` | Filter by category. Comma-separated for multiple (OR-matched), e.g. `http,dns` |
 | `--level <level>` | Minimum log level: `debug`, `info`, `default`, `error`, `fault` |
 | `--grep <pattern>` | Filter messages by regex pattern |
 | `--exclude-grep <pattern>` | Exclude messages matching regex pattern |
@@ -175,6 +175,10 @@ slog stream --process Finder
 
 # Stream network-related logs
 slog stream --subsystem com.apple.network
+
+# Stream multiple processes or subsystems (comma-separated, OR-matched)
+slog stream --process Finder,Dock
+slog stream --subsystem com.apple.network,com.apple.CFNetwork
 
 # Stream errors and faults only
 slog stream --level error
@@ -310,6 +314,8 @@ All log commands are exposed as MCP tools with the `slog_` prefix:
 - `slog_doctor` — Check system requirements
 
 MCP tools return JSON format. For token-optimized output, use the CLI with `--format toon`.
+
+`slog_show` and `slog_stream` accept `process`, `subsystem`, and `category` as JSON arrays (e.g. `"process": ["Finder", "Dock"]`); multiple values are OR-matched.
 
 `slog_show` returns `{ entries, count, elapsed_ms, hint? }` and `slog_stream` returns `{ entries, captured, requested, stopped_by, elapsed_ms }`. The `hint` field on `slog_show` is populated only when `count == 0` and explains the most likely cause (e.g. custom subsystems don't persist debug events by default — use `slog_stream` for live capture). `stopped_by` on `slog_stream` is one of `count` / `timeout` / `exhausted` / `error`.
 

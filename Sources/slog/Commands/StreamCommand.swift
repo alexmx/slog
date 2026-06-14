@@ -22,7 +22,7 @@ struct StreamCommand: AsyncParsableCommand {
 
     // MARK: - Target Options
 
-    @Option(name: .long, help: "Filter by process name")
+    @Option(name: .long, help: "Filter by process name (comma-separated for multiple, e.g. Finder,Dock)")
     var process: String?
 
     @Option(name: .long, help: "Filter by process ID")
@@ -36,10 +36,10 @@ struct StreamCommand: AsyncParsableCommand {
 
     // MARK: - Filter Options
 
-    @Option(name: .long, help: "Filter by subsystem (e.g., com.apple.network)")
+    @Option(name: .long, help: "Filter by subsystem (comma-separated for multiple, e.g. com.apple.network,com.apple.CFNetwork)")
     var subsystem: String?
 
-    @Option(name: .long, help: "Filter by category")
+    @Option(name: .long, help: "Filter by category (comma-separated for multiple, e.g. http,dns)")
     var category: String?
 
     @Option(name: .long, help: "Minimum log level (debug, info, default, error, fault)")
@@ -130,10 +130,10 @@ struct StreamCommand: AsyncParsableCommand {
 
         // Build predicate, filter chain, and log level inclusion
         let setup = try FilterSetup.build(
-            process: effectiveProcess,
+            processes: FilterSetup.splitCSV(effectiveProcess),
             pid: effectivePid,
-            subsystem: effectiveSubsystem,
-            category: effectiveCategory,
+            subsystems: FilterSetup.splitCSV(effectiveSubsystem),
+            categories: FilterSetup.splitCSV(effectiveCategory),
             level: effectiveLevel,
             grep: effectiveGrep,
             excludeGrep: effectiveExcludeGrep,

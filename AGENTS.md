@@ -102,7 +102,7 @@ Formula location: `alexmx/homebrew-tools/Formula/slog.rb`
 Six subcommands. `stream` is the default (can be omitted).
 
 ### Streaming & Querying
-- **stream** — Stream live logs. Filters: `--process`, `--subsystem`, `--category`, `--level`, `--grep`, `--exclude-grep`. Output: `--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`. Bounded capture: `--timeout`, `--capture`, `--count`.
+- **stream** — Stream live logs. Filters: `--process`, `--subsystem`, `--category` (each comma-separated for multiple values, OR-matched), `--level`, `--grep`, `--exclude-grep`. Output: `--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`. Bounded capture: `--timeout`, `--capture`, `--count`.
 - **show** — Query historical logs. Requires `--last`, `--start`, or archive path. Same filters and output options as stream.
 
 ### Configuration

@@ -155,9 +155,9 @@ public struct PredicateBuilder: Sendable {
 
     public init() {}
 
-    /// Filter by process name
-    public mutating func process(_ name: String) {
-        components.append("processImagePath ENDSWITH \"/\(name)\"")
+    /// Filter by process name (multiple values OR-grouped)
+    public mutating func processes(_ names: [String]) {
+        appendOred(names.map { "processImagePath ENDSWITH \"/\($0)\"" })
     }
 
     /// Filter by process ID
@@ -165,14 +165,19 @@ public struct PredicateBuilder: Sendable {
         components.append("processID == \(pid)")
     }
 
-    /// Filter by subsystem (uses BEGINSWITH to include child subsystems)
-    public mutating func subsystem(_ subsystem: String) {
-        components.append("subsystem BEGINSWITH \"\(subsystem)\"")
+    /// Filter by subsystem (uses BEGINSWITH to include child subsystems; multiple values OR-grouped)
+    public mutating func subsystems(_ values: [String]) {
+        appendOred(values.map { "subsystem BEGINSWITH \"\($0)\"" })
     }
 
-    /// Filter by category
-    public mutating func category(_ category: String) {
-        components.append("category == \"\(category)\"")
+    /// Filter by category (multiple values OR-grouped)
+    public mutating func categories(_ values: [String]) {
+        appendOred(values.map { "category == \"\($0)\"" })
+    }
+
+    private mutating func appendOred(_ parts: [String]) {
+        guard !parts.isEmpty else { return }
+        components.append(parts.count == 1 ? parts[0] : "(\(parts.joined(separator: " OR ")))")
     }
 
     /// Filter by minimum log level
@@ -206,28 +211,23 @@ public struct PredicateBuilder: Sendable {
         return components.joined(separator: " AND ")
     }
 
-    /// Create a predicate string from common filter options
+    /// Create a predicate string from common filter options.
+    /// `processes`, `subsystems`, and `categories` accept multiple values that are OR-grouped.
     public static func buildPredicate(
-        process: String? = nil,
+        processes: [String] = [],
         pid: Int? = nil,
-        subsystem: String? = nil,
-        category: String? = nil,
+        subsystems: [String] = [],
+        categories: [String] = [],
         level: LogLevel? = nil
     ) -> String? {
         var builder = PredicateBuilder()
 
-        if let process {
-            builder.process(process)
-        }
+        builder.processes(processes)
         if let pid {
             builder.pid(pid)
         }
-        if let subsystem {
-            builder.subsystem(subsystem)
-        }
-        if let category {
-            builder.category(category)
-        }
+        builder.subsystems(subsystems)
+        builder.categories(categories)
         if let level {
             builder.level(level)
         }

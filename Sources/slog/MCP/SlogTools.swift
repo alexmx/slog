@@ -129,20 +129,20 @@ enum SlogTools {
     /// Build a `FilterSetup` from MCP args, packaging `FilterSetupError` into
     /// an `errorJSON` payload.
     private static func buildFilterSetup(
-        process: String?,
+        processes: [String]?,
         pid: Int?,
-        subsystem: String?,
-        category: String?,
+        subsystems: [String]?,
+        categories: [String]?,
         level: String?,
         grep: String?,
         excludeGrep: String?
     ) -> FilterSetupOutcome {
         do {
             let setup = try FilterSetup.build(
-                process: process,
+                processes: processes ?? [],
                 pid: pid,
-                subsystem: subsystem,
-                category: category,
+                subsystems: subsystems ?? [],
+                categories: categories ?? [],
                 level: level.flatMap { LogLevel(string: $0) },
                 grep: grep,
                 excludeGrep: excludeGrep
@@ -168,17 +168,17 @@ enum SlogTools {
         @InputProperty("End date for custom range (e.g. '2024-01-15 11:00:00'). Optional — omit to query from start to now.")
         var end: String?
 
-        @InputProperty("Filter by process name (use slog_list_processes to discover names)")
-        var process: String?
+        @InputProperty("Filter by process name(s) — array, OR-matched (use slog_list_processes to discover names). Example: [\"Finder\", \"Dock\"].")
+        var process: [String]?
 
         @InputProperty("Filter by process ID")
         var pid: Int?
 
-        @InputProperty("Filter by subsystem (e.g. 'com.apple.network'). Automatically includes debug logs.")
-        var subsystem: String?
+        @InputProperty("Filter by subsystem(s) — array, OR-matched (e.g. [\"com.apple.network\"]). Automatically includes debug logs.")
+        var subsystem: [String]?
 
-        @InputProperty("Filter by category (use with subsystem for precise filtering)")
-        var category: String?
+        @InputProperty("Filter by category(ies) — array, OR-matched (use with subsystem for precise filtering). Example: [\"http\", \"dns\"].")
+        var category: [String]?
 
         @InputProperty("Minimum log level: debug, info, default, error, fault. Narrows results when too many entries.")
         var level: String?
@@ -197,17 +197,17 @@ enum SlogTools {
     }
 
     struct StreamArgs: MCPToolInput {
-        @InputProperty("Filter by process name (use slog_list_processes to discover names)")
-        var process: String?
+        @InputProperty("Filter by process name(s) — array, OR-matched (use slog_list_processes to discover names). Example: [\"Finder\", \"Dock\"].")
+        var process: [String]?
 
         @InputProperty("Filter by process ID")
         var pid: Int?
 
-        @InputProperty("Filter by subsystem (e.g. 'com.apple.network'). Automatically includes debug logs.")
-        var subsystem: String?
+        @InputProperty("Filter by subsystem(s) — array, OR-matched (e.g. [\"com.apple.network\"]). Automatically includes debug logs.")
+        var subsystem: [String]?
 
-        @InputProperty("Filter by category (use with subsystem for precise filtering)")
-        var category: String?
+        @InputProperty("Filter by category(ies) — array, OR-matched (use with subsystem for precise filtering). Example: [\"http\", \"dns\"].")
+        var category: [String]?
 
         @InputProperty("Minimum log level: debug, info, default, error, fault. Narrows results when too many entries.")
         var level: String?
@@ -275,10 +275,10 @@ enum SlogTools {
 
         let setup: FilterSetup
         switch buildFilterSetup(
-            process: args.process,
+            processes: args.process,
             pid: args.pid,
-            subsystem: args.subsystem,
-            category: args.category,
+            subsystems: args.subsystem,
+            categories: args.category,
             level: args.level,
             grep: args.grep,
             excludeGrep: args.exclude_grep
@@ -342,14 +342,16 @@ enum SlogTools {
     /// Reasons we can offer when `slog_show` returns 0 entries. Order matters
     /// — the most specific cause wins.
     private static func emptyShowHint(args: ShowArgs) -> String? {
-        if args.subsystem != nil, args.level == nil {
+        let hasSubsystem = !(args.subsystem ?? []).isEmpty
+        let hasProcess = !(args.process ?? []).isEmpty
+        if hasSubsystem, args.level == nil {
             return """
             No events matched. Custom subsystems often emit only debug events, \
             which aren't persisted by default — try `slog_stream` for live capture, \
             or pre-enable persistence via `sudo log config --subsystem <name> --mode persist:debug`.
             """
         }
-        if args.process != nil, args.subsystem == nil {
+        if hasProcess, !hasSubsystem {
             return """
             No events matched. Process-only queries see only default+ persistent events. \
             If you control the app, filter by its subsystem and use `slog_stream` for debug events.
@@ -392,10 +394,10 @@ enum SlogTools {
 
         let setup: FilterSetup
         switch buildFilterSetup(
-            process: args.process,
+            processes: args.process,
             pid: args.pid,
-            subsystem: args.subsystem,
-            category: args.category,
+            subsystems: args.subsystem,
+            categories: args.category,
             level: args.level,
             grep: args.grep,
             excludeGrep: args.exclude_grep

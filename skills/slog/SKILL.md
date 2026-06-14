@@ -43,14 +43,14 @@ slog [options]  # equivalent — stream is the default command
 ```
 
 **Target:**
-- `--process <name>` — filter by process name
+- `--process <name>` — filter by process name. Comma-separated for multiple (OR-matched): `--process Finder,Dock`
 - `--pid <id>` — filter by process ID
 - `--simulator` — stream from iOS Simulator
 - `--simulator-udid <udid>` — specific Simulator UDID (auto-detects if one is booted)
 
 **Filters:**
-- `--subsystem <name>` — e.g. `com.apple.network`
-- `--category <name>` — filter by category
+- `--subsystem <name>` — e.g. `com.apple.network`. Comma-separated for multiple (OR-matched): `--subsystem com.apple.network,com.apple.CFNetwork`
+- `--category <name>` — filter by category. Comma-separated for multiple (OR-matched): `--category http,dns`
 - `--level <level>` — minimum level: `debug`, `info`, `default`, `error`, `fault`
 - `--grep <pattern>` — regex filter on message content
 - `--exclude-grep <pattern>` — exclude messages matching regex
@@ -169,6 +169,8 @@ slog mcp --setup    # Print integration instructions
 
 Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`.
 
+In `slog_show` and `slog_stream`, `process`, `subsystem`, and `category` accept JSON arrays (OR-matched), e.g. `{"process": ["Finder", "Dock"]}`. The CLI uses comma-separated strings for the same effect.
+
 ## Filtering Strategies
 
 When debugging log output, use this efficient approach:
@@ -187,6 +189,13 @@ When debugging log output, use this efficient approach:
    slog stream --process MyApp --level error --grep "timeout|connection"
    # Exclude noisy heartbeat logs
    slog stream --process MyApp --exclude-grep "heartbeat|keepalive"
+   ```
+
+   `--process`, `--subsystem`, and `--category` each accept comma-separated values that are OR-matched server-side:
+   ```bash
+   slog stream --process Finder,Dock
+   slog show --last 1h --subsystem com.apple.network,com.apple.CFNetwork
+   slog stream --process MyApp --category http,dns
    ```
 
 3. **Use profiles for repeated queries**: Save complex filter combinations

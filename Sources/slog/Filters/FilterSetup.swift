@@ -22,14 +22,18 @@ public struct FilterSetup: Sendable {
 
     /// Build a FilterSetup from common filter parameters.
     ///
+    /// `processes`, `subsystems`, and `categories` accept multiple values that are
+    /// OR-grouped in the resulting predicate. Pass already-parsed arrays — callers
+    /// dealing with comma-separated CLI/profile strings should run `splitCSV` first.
+    ///
     /// Consolidates PredicateBuilder, FilterChain grep/excludeGrep, and auto-debug logic.
-    /// Auto-debug: when subsystem is set without explicit level or info/debug flags,
+    /// Auto-debug: when a subsystem is set without explicit level or info/debug flags,
     /// debug and info messages are automatically included.
     public static func build(
-        process: String? = nil,
+        processes: [String] = [],
         pid: Int? = nil,
-        subsystem: String? = nil,
-        category: String? = nil,
+        subsystems: [String] = [],
+        categories: [String] = [],
         level: LogLevel? = nil,
         grep: String? = nil,
         excludeGrep: String? = nil,
@@ -37,10 +41,10 @@ public struct FilterSetup: Sendable {
         debug: Bool = false
     ) throws -> FilterSetup {
         let predicate = PredicateBuilder.buildPredicate(
-            process: process,
+            processes: processes,
             pid: pid,
-            subsystem: subsystem,
-            category: category,
+            subsystems: subsystems,
+            categories: categories,
             level: level
         )
 
@@ -54,7 +58,7 @@ public struct FilterSetup: Sendable {
             catch { throw FilterSetupError.invalidRegex(field: "exclude_grep", reason: error.localizedDescription) }
         }
 
-        let autoDebug = subsystem != nil && level == nil && !info && !debug
+        let autoDebug = !subsystems.isEmpty && level == nil && !info && !debug
         let includeDebug = debug || autoDebug
         let includeInfo = info || includeDebug
 
@@ -64,6 +68,15 @@ public struct FilterSetup: Sendable {
             includeInfo: includeInfo,
             includeDebug: includeDebug
         )
+    }
+
+    /// Split a comma-separated string into trimmed, non-empty tokens.
+    /// Used by callers (CLI, profile loader) that receive raw user input as `String?`.
+    public static func splitCSV(_ raw: String?) -> [String] {
+        guard let raw else { return [] }
+        return raw.split(separator: ",", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 }
 

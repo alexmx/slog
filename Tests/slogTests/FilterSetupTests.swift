@@ -13,7 +13,7 @@ struct FilterSetupTests {
 
     @Test("Auto-debug enables when subsystem set without level")
     func autoDebugWithSubsystem() throws {
-        let setup = try FilterSetup.build(subsystem: "com.apple.network")
+        let setup = try FilterSetup.build(subsystems: ["com.apple.network"])
 
         #expect(setup.includeDebug == true)
         #expect(setup.includeInfo == true)
@@ -22,7 +22,7 @@ struct FilterSetupTests {
     @Test("Auto-debug disabled when level is explicit")
     func noAutoDebugWithLevel() throws {
         let setup = try FilterSetup.build(
-            subsystem: "com.apple.network",
+            subsystems: ["com.apple.network"],
             level: .error
         )
 
@@ -33,7 +33,7 @@ struct FilterSetupTests {
     @Test("Auto-debug disabled when info flag is explicit")
     func noAutoDebugWithInfoFlag() throws {
         let setup = try FilterSetup.build(
-            subsystem: "com.apple.network",
+            subsystems: ["com.apple.network"],
             info: true
         )
 
@@ -44,7 +44,7 @@ struct FilterSetupTests {
     @Test("Auto-debug disabled when debug flag is explicit")
     func noAutoDebugWithDebugFlag() throws {
         let setup = try FilterSetup.build(
-            subsystem: "com.apple.network",
+            subsystems: ["com.apple.network"],
             debug: true
         )
 
@@ -54,7 +54,7 @@ struct FilterSetupTests {
 
     @Test("No auto-debug without subsystem")
     func noAutoDebugWithoutSubsystem() throws {
-        let setup = try FilterSetup.build(process: "Finder")
+        let setup = try FilterSetup.build(processes: ["Finder"])
 
         #expect(setup.includeDebug == false)
         #expect(setup.includeInfo == false)
@@ -95,7 +95,7 @@ struct FilterSetupTests {
 
     @Test("Predicate includes process filter")
     func processFilter() throws {
-        let setup = try FilterSetup.build(process: "Finder")
+        let setup = try FilterSetup.build(processes: ["Finder"])
 
         #expect(setup.predicate?.contains("processImagePath ENDSWITH \"/Finder\"") == true)
     }
@@ -103,8 +103,8 @@ struct FilterSetupTests {
     @Test("Predicate includes subsystem and category")
     func subsystemAndCategory() throws {
         let setup = try FilterSetup.build(
-            subsystem: "com.apple.network",
-            category: "http"
+            subsystems: ["com.apple.network"],
+            categories: ["http"]
         )
 
         #expect(setup.predicate?.contains("subsystem BEGINSWITH \"com.apple.network\"") == true)
@@ -119,11 +119,67 @@ struct FilterSetupTests {
         #expect(setup.predicate?.contains("processID == 1234") == true)
     }
 
+    @Test("Multiple processes OR-grouped in predicate")
+    func multipleProcesses() throws {
+        let setup = try FilterSetup.build(processes: ["Finder", "Dock"])
+
+        #expect(setup.predicate == "(processImagePath ENDSWITH \"/Finder\" OR processImagePath ENDSWITH \"/Dock\")")
+    }
+
+    @Test("Multiple subsystems OR-grouped in predicate")
+    func multipleSubsystems() throws {
+        let setup = try FilterSetup.build(subsystems: ["com.apple.network", "com.apple.CFNetwork"])
+
+        #expect(setup.predicate == "(subsystem BEGINSWITH \"com.apple.network\" OR subsystem BEGINSWITH \"com.apple.CFNetwork\")")
+    }
+
+    @Test("Multiple categories OR-grouped in predicate")
+    func multipleCategories() throws {
+        let setup = try FilterSetup.build(categories: ["http", "dns"])
+
+        #expect(setup.predicate == "(category == \"http\" OR category == \"dns\")")
+    }
+
+    @Test("Auto-debug triggers when multiple subsystems are set")
+    func autoDebugMultipleSubsystems() throws {
+        let setup = try FilterSetup.build(subsystems: ["com.apple.network", "com.apple.CFNetwork"])
+
+        #expect(setup.includeDebug == true)
+        #expect(setup.includeInfo == true)
+    }
+
+    // MARK: - splitCSV Helper
+
+    @Test("splitCSV returns empty for nil")
+    func splitCSVNil() {
+        #expect(FilterSetup.splitCSV(nil) == [])
+    }
+
+    @Test("splitCSV splits comma-separated values")
+    func splitCSVBasic() {
+        #expect(FilterSetup.splitCSV("a,b,c") == ["a", "b", "c"])
+    }
+
+    @Test("splitCSV trims whitespace")
+    func splitCSVTrims() {
+        #expect(FilterSetup.splitCSV(" a , b ,  c ") == ["a", "b", "c"])
+    }
+
+    @Test("splitCSV drops empty entries")
+    func splitCSVDropsEmpty() {
+        #expect(FilterSetup.splitCSV("a,,b,") == ["a", "b"])
+    }
+
+    @Test("splitCSV with single value returns one element")
+    func splitCSVSingle() {
+        #expect(FilterSetup.splitCSV("just-one") == ["just-one"])
+    }
+
     // MARK: - Filter Chain
 
     @Test("Filter chain is empty when no grep patterns")
     func emptyFilterChain() throws {
-        let setup = try FilterSetup.build(process: "Finder")
+        let setup = try FilterSetup.build(processes: ["Finder"])
 
         #expect(setup.filterChain.isEmpty == true)
     }
