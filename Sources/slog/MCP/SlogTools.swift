@@ -200,141 +200,109 @@ enum SlogTools {
     // MARK: - Argument Types
 
     struct ShowArgs: MCPToolInput {
-        @InputProperty("Time range: duration (e.g. '5m', '1h') or 'boot' for last boot. Start here for quick lookback.")
+        @InputProperty("Time range: duration ('5m', '1h') or 'boot'.")
         var last: String?
 
-        @InputProperty("Start date for custom range (e.g. '2024-01-15 10:30:00'). Use with 'end' instead of 'last'.")
+        @InputProperty("Range start, e.g. '2024-01-15 10:30:00'. Use with `end` instead of `last`.")
         var start: String?
 
-        @InputProperty(
-            "End date for custom range (e.g. '2024-01-15 11:00:00'). Optional — omit to query from start to now."
-        )
+        @InputProperty("Range end. Omit to query to now.")
         var end: String?
 
-        @InputProperty(
-            "Filter by process name(s) — array, OR-matched (use slog_list_processes to discover names). Example: [\"Finder\", \"Dock\"]."
-        )
+        @InputProperty("Process name(s), array, OR-matched. e.g. [\"Finder\", \"Dock\"].")
         var process: [String]?
 
-        @InputProperty("Filter by process ID")
+        @InputProperty("Process ID.")
         var pid: Int?
 
-        @InputProperty(
-            "Filter by subsystem(s) — array, OR-matched (e.g. [\"com.apple.network\"]). Automatically includes debug logs."
-        )
+        @InputProperty("Subsystem(s), array, OR-matched. Auto-includes debug+info.")
         var subsystem: [String]?
 
-        @InputProperty(
-            "Filter by category(ies) — array, OR-matched (use with subsystem for precise filtering). Example: [\"http\", \"dns\"]."
-        )
+        @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem`.")
         var category: [String]?
 
-        @InputProperty("Minimum log level: debug, info, default, error, fault. Narrows results when too many entries.")
+        @InputProperty("Min level: debug, info, default, error, fault.")
         var level: String?
 
-        @InputProperty("Filter messages by regex pattern (client-side, applied after retrieval)")
+        @InputProperty("Regex filter on message (client-side).")
         var grep: String?
 
-        @InputProperty("Exclude messages matching regex (e.g. 'heartbeat|keepalive' to remove noise)")
+        @InputProperty("Regex exclusion on message, e.g. 'heartbeat|keepalive'.")
         var exclude_grep: String?
 
-        @InputProperty(
-            "Maximum number of entries to retain for `entries`/`head`/`tail`/`output_file` (default: 500). The summary is still computed over the full population — up to a 100,000-event scan ceiling."
-        )
+        @InputProperty("Max entries retained for `entries`/`head`/`tail`/`output_file` (default 500). Summary always scans the full population up to 100k events.")
         var limit: Int?
 
-        @InputProperty("Path to a .logarchive file (alternative to last/start)")
+        @InputProperty("Path to a .logarchive file (alternative to `last`/`start`).")
         var archive_path: String?
 
-        @InputProperty(
-            "Path to write the full result set as NDJSON (one entry per line). When omitted and the result exceeds the inline threshold, writes to `$XDG_CACHE_HOME/slog/runs/`. Use `Read offset/limit` or `jq` on this file to drill in."
-        )
+        @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
         var output_file: String?
 
-        @InputProperty(
-            "Return every entry inline instead of the default summary+head+tail envelope. Off by default — only set this when you genuinely need the full payload in the response. Mutually exclusive with `summary_only`."
-        )
+        @InputProperty("Inline every entry, bypassing truncation. Mutex with `summary_only`.")
         var full: Bool?
 
-        @InputProperty(
-            "Return only the aggregate summary (no entries, no spill file). Use for questions like 'errors per subsystem in the last hour' where individual events aren't needed. Mutually exclusive with `full`."
-        )
+        @InputProperty("Return only the aggregate summary (no entries, no spill). Mutex with `full`.")
         var summary_only: Bool?
     }
 
     struct StreamArgs: MCPToolInput {
-        @InputProperty(
-            "Filter by process name(s) — array, OR-matched (use slog_list_processes to discover names). Example: [\"Finder\", \"Dock\"]."
-        )
+        @InputProperty("Process name(s), array, OR-matched. e.g. [\"Finder\", \"Dock\"].")
         var process: [String]?
 
-        @InputProperty("Filter by process ID")
+        @InputProperty("Process ID.")
         var pid: Int?
 
-        @InputProperty(
-            "Filter by subsystem(s) — array, OR-matched (e.g. [\"com.apple.network\"]). Automatically includes debug logs."
-        )
+        @InputProperty("Subsystem(s), array, OR-matched. Auto-includes debug+info.")
         var subsystem: [String]?
 
-        @InputProperty(
-            "Filter by category(ies) — array, OR-matched (use with subsystem for precise filtering). Example: [\"http\", \"dns\"]."
-        )
+        @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem`.")
         var category: [String]?
 
-        @InputProperty("Minimum log level: debug, info, default, error, fault. Narrows results when too many entries.")
+        @InputProperty("Min level: debug, info, default, error, fault.")
         var level: String?
 
-        @InputProperty("Filter messages by regex pattern (client-side, applied after retrieval)")
+        @InputProperty("Regex filter on message (client-side).")
         var grep: String?
 
-        @InputProperty("Exclude messages matching regex (e.g. 'heartbeat|keepalive' to remove noise)")
+        @InputProperty("Regex exclusion on message, e.g. 'heartbeat|keepalive'.")
         var exclude_grep: String?
 
-        @InputProperty("Number of entries to capture (required, max 1000). Controls how long the stream runs.")
+        @InputProperty("Entries to capture (required, 1–1000).")
         var count: Int
 
-        @InputProperty(
-            "Maximum time to wait in seconds (default: 30). Stream returns collected entries when timeout is reached, even if count hasn't been met."
-        )
+        @InputProperty("Max wait seconds (default 30). Returns whatever is captured on timeout.")
         var timeout: Int?
 
-        @InputProperty("Stream from iOS Simulator instead of host (use slog_list_simulators to find devices)")
+        @InputProperty("Stream from iOS Simulator.")
         var simulator: Bool?
 
-        @InputProperty("Simulator UDID (auto-detects if only one booted). Use slog_list_simulators to find UDIDs.")
+        @InputProperty("Simulator UDID (auto-detects if exactly one is booted).")
         var simulator_udid: String?
 
-        @InputProperty(
-            "Path to write the full result set as NDJSON (one entry per line). When omitted and the result exceeds the inline threshold, writes to `$XDG_CACHE_HOME/slog/runs/`. Use `Read offset/limit` or `jq` on this file to drill in."
-        )
+        @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
         var output_file: String?
 
-        @InputProperty(
-            "Return every entry inline instead of the default summary+head+tail envelope. Off by default — only set this when you genuinely need the full payload in the response."
-        )
+        @InputProperty("Inline every entry, bypassing truncation.")
         var full: Bool?
     }
 
     struct ListProcessesArgs: MCPToolInput {
-        @InputProperty("Filter processes by name (case-insensitive). Omit to list all running processes.")
+        @InputProperty("Name substring filter (case-insensitive).")
         var filter: String?
 
-        @InputProperty(
-            "Path to write the full process list as NDJSON (one entry per line). When omitted and the result exceeds the inline threshold, writes to `$XDG_CACHE_HOME/slog/runs/`."
-        )
+        @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
         var output_file: String?
 
-        @InputProperty(
-            "Return every process inline instead of the default truncated head+tail envelope. Off by default — set this only when you need the full list in the response."
-        )
+        @InputProperty("Inline every process, bypassing truncation.")
         var full: Bool?
     }
 
     struct ListSimulatorsArgs: MCPToolInput {
-        @InputProperty("Show only booted simulators (recommended — these are the ones you can stream from)")
+        @InputProperty("Only booted simulators (the streamable ones).")
         var booted: Bool?
 
-        @InputProperty("Include unavailable simulators (runtimes not installed)")
+        @InputProperty("Include unavailable simulators (uninstalled runtimes).")
         var all: Bool?
     }
 
@@ -343,39 +311,21 @@ enum SlogTools {
     static let show = MCPTool(
         name: "slog_show",
         description: """
-        Query historical/persisted macOS logs. **Use this for post-mortem analysis** — \
-        investigating what happened in the recent past.
+        Query historical/persisted macOS logs. Requires one time source: `last`, \
+        `start`/`end`, or `archive_path`. Filtering by `subsystem` auto-includes debug+info.
 
-        Requires one time source: `last` ('5m', '1h', 'boot'), `start`/`end` date range, \
-        or `archive_path`. Start with broad filters (process only), then narrow with \
-        subsystem/level/grep. Filtering by `subsystem` auto-includes debug+info; \
-        otherwise only default+ levels are returned.
+        Response: `{ count, elapsed_ms, scan_capped, truncated, summary, entries?, head?, tail?, output_file?, hint? }`.
+          - ≤50 entries → inline as `entries`.
+          - >50 entries → `summary` (time range, by_level, top processes/subsystems/categories) + `head`/`tail` (10 each) + full payload as NDJSON at `output_file`. Drill in with `Read offset/limit` or `jq`; do not slurp.
+          - `full: true` → inline every entry.
+          - `summary_only: true` → just `{ count, elapsed_ms, scan_capped, summary, hint? }`. Use for aggregate questions. Mutex with `full`.
 
-        **Response shape (default):** `{ count, elapsed_ms, scan_capped, truncated, summary, entries?, head?, tail?, output_file?, hint? }`. \
-        Small result sets (≤50 entries) come back fully inline as `entries`. Larger sets \
-        are truncated by default: `summary` (time range, by-level counts, top processes/\
-        subsystems/categories), plus `head` and `tail` samples (10 each), and the complete \
-        payload written as NDJSON to `output_file`. Read that file selectively with `Read \
-        offset/limit` or `jq` — do NOT slurp the whole file unless you actually need it. \
-        Set `full: true` to bypass truncation and inline every entry. Supply `output_file` \
-        to control where the NDJSON lands; otherwise it goes under `$XDG_CACHE_HOME/slog/runs/`.
+        `summary` always covers the full matched population, scanning up to 100,000 events. \
+        `scan_capped: true` warns if that ceiling was hit — narrow the window. `limit` only caps retained entries.
 
-        **Aggregate-only mode:** set `summary_only: true` to get just `{ count, elapsed_ms, scan_capped, summary, hint? }`. \
-        No entries, no spill file. Use this for questions like "errors per subsystem in the last hour" — \
-        much cheaper than retrieving entries you don't need.
-
-        **Summary accuracy:** `summary` always reflects the full matched population, not just \
-        the retained `entries`. The handler streams up to 100,000 matching events per call; if \
-        the ceiling is reached, `scan_capped: true` warns the caller to narrow the window. \
-        `limit` only caps how many entries are retained for inline/spill, never the summary scan.
-
-        The optional `hint` appears only when `count == 0` and explains the most likely cause.
-
-        **Note on debug events:** Custom (non-Apple) subsystems do not persist debug-level \
-        events by default — `log show` cannot replay them after the fact, even with --debug. \
-        If you see 0 results from a subsystem you know is logging, use `slog_stream` for \
-        live capture instead, or enable persistence once via \
-        `sudo log config --subsystem <name> --mode persist:debug`.
+        `hint` appears only when `count == 0`. Custom (non-Apple) subsystems don't persist debug \
+        events by default; if `slog_show` returns 0 from one, use `slog_stream` for live capture \
+        or pre-enable persistence via `sudo log config --subsystem <name> --mode persist:debug`.
         """
     ) { (args: ShowArgs) in
         // Validate: need at least one time source
@@ -534,29 +484,17 @@ enum SlogTools {
     static let stream = MCPTool(
         name: "slog_stream",
         description: """
-        Stream live macOS/iOS logs with bounded capture. **Use this for real-time debugging** \
-        and for capturing debug events from your own app's subsystem (which `slog_show` cannot \
-        see unless persistence was pre-enabled).
+        Stream live macOS/iOS logs with bounded capture. Use for real-time debugging or \
+        capturing debug events from custom subsystems (which `slog_show` can't replay).
 
-        `count` is required and must be 1–1000; the call returns as soon as that many entries \
-        match, or `timeout` seconds pass (default 30s), whichever comes first. Start with broad \
-        filters (process only), then narrow with subsystem/level/grep. Filtering by `subsystem` \
-        auto-includes debug+info. iOS Simulator capture via `simulator: true`.
+        `count` is required (1–1000). Returns when count is met or `timeout` (default 30s) \
+        elapses. Filtering by `subsystem` auto-includes debug+info. iOS Simulator via `simulator: true`.
 
-        **Response shape (default):** `{ captured, requested, stopped_by, elapsed_ms, truncated, summary, entries?, head?, tail?, output_file? }`. \
-        Small captures (≤50 entries) come back fully inline as `entries`. Larger captures are \
-        truncated by default: `summary` plus `head`/`tail` samples, with the complete payload \
-        written as NDJSON to `output_file`. Read that file selectively with `Read offset/limit` \
-        or `jq`. Set `full: true` to inline every entry. Supply `output_file` to control where \
-        the NDJSON lands; otherwise it goes under `$XDG_CACHE_HOME/slog/runs/`.
+        Response: `{ captured, requested, stopped_by, elapsed_ms, truncated, summary, entries?, head?, tail?, output_file? }`.
+          - Envelope mirrors `slog_show`: ≤50 inline as `entries`; >50 → `summary` + `head`/`tail` + NDJSON at `output_file`. `full: true` inlines every entry.
+          - `stopped_by`: `count` (success) | `timeout` | `exhausted` (rare) | `error`.
 
-        `stopped_by`:
-          - "count"     — reached `requested` entries (success path)
-          - "timeout"   — hit `timeout` seconds without enough matches
-          - "exhausted" — stream closed before count/timeout (rare)
-          - "error"     — underlying `log stream` failed
-        When `captured == 0`, inspect `elapsed_ms` and `stopped_by` to decide whether to \
-        retry with a wider window or a different filter.
+        When `captured == 0`, inspect `elapsed_ms` and `stopped_by` before retrying with a wider window.
         """
     ) { (args: StreamArgs) in
         guard args.count > 0 else {
@@ -670,16 +608,13 @@ enum SlogTools {
     static let listProcesses = MCPTool(
         name: "slog_list_processes",
         description: """
-        List running macOS processes. **Use this first** to discover process names for \
-        filtering with slog_show or slog_stream. Use `filter` to narrow by name substring \
-        before truncation kicks in.
+        List running macOS processes. Call first to discover names for `slog_show`/`slog_stream` \
+        `process` arg. Use `filter` to narrow by name substring before truncation kicks in.
 
-        **Response shape:** `{ count, truncated, processes?, head?, tail?, output_file? }`. \
-        Small result sets (≤50 processes) come back fully inline as `processes`. Larger sets \
-        are truncated by default: `head` and `tail` samples (10 each, alphabetical), with the \
-        complete list written as NDJSON to `output_file` — read selectively with `Read \
-        offset/limit` or `jq`. Set `full: true` to inline every process. Supply `output_file` \
-        to control where the NDJSON lands; otherwise it goes under `$XDG_CACHE_HOME/slog/runs/`.
+        Response: `{ count, truncated, processes?, head?, tail?, output_file? }`.
+          - ≤50 → inline as `processes`.
+          - >50 → `head`/`tail` (10 each, alphabetical) + full list as NDJSON at `output_file`.
+          - `full: true` → inline every process.
         """
     ) { (args: ListProcessesArgs) in
         let processes = try SystemQuery.listProcesses(filter: args.filter)
@@ -707,7 +642,7 @@ enum SlogTools {
 
     static let listSimulators = MCPTool(
         name: "slog_list_simulators",
-        description: "List iOS Simulators. Use this to find simulator UDIDs for streaming logs with slog_stream's 'simulator' flag. Returns JSON array of {name, udid, state, runtime} objects."
+        description: "List iOS Simulators. Use to find UDIDs for `slog_stream` with `simulator: true`. Returns array of `{name, udid, state, runtime}`."
     ) { (args: ListSimulatorsArgs) in
         let simulators = try SystemQuery.listSimulators(
             booted: args.booted ?? false,
@@ -718,7 +653,7 @@ enum SlogTools {
 
     static let doctor = MCPTool(
         name: "slog_doctor",
-        description: "Check system requirements for slog. Run this if other tools fail unexpectedly — it verifies log CLI access, stream/archive access, simulator support, and profile directory. Returns JSON object with check results."
+        description: "Check system requirements: log CLI, stream/archive access, simctl, profiles dir. Run if other tools fail unexpectedly."
     ) {
         let checks = DoctorCheck.runAll()
         return try json(checks)

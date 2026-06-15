@@ -313,11 +313,26 @@ All log commands are exposed as MCP tools with the `slog_` prefix:
 - `slog_list_simulators` — List iOS Simulators
 - `slog_doctor` — Check system requirements
 
-MCP tools return JSON format. For token-optimized output, use the CLI with `--format toon`.
+MCP tools return JSON. For token-optimized CLI output, use `--format toon`.
 
 `slog_show` and `slog_stream` accept `process`, `subsystem`, and `category` as JSON arrays (e.g. `"process": ["Finder", "Dock"]`); multiple values are OR-matched.
 
-`slog_show` returns `{ entries, count, elapsed_ms, hint? }` and `slog_stream` returns `{ entries, captured, requested, stopped_by, elapsed_ms }`. The `hint` field on `slog_show` is populated only when `count == 0` and explains the most likely cause (e.g. custom subsystems don't persist debug events by default — use `slog_stream` for live capture). `stopped_by` on `slog_stream` is one of `count` / `timeout` / `exhausted` / `error`.
+### Response Envelope
+
+`slog_show`, `slog_stream`, and `slog_list_processes` share a token-cheap response contract to avoid dumping multi-KB single-line JSON blobs into the agent's context:
+
+- **≤50 items** — returned fully inline (`entries` / `processes`), no spill.
+- **&gt;50 items** — response includes a `summary` (where applicable), plus `head` and `tail` samples (10 each), with the complete payload written as NDJSON to `output_file`. Default spill path is `$XDG_CACHE_HOME/slog/runs/<prefix>-<UTC stamp>.ndjson`. Use `Read offset/limit` or `jq` on this file to drill in selectively.
+- Pass **`output_file: "<path>"`** to control where the NDJSON lands (tilde-expanded, parent dirs auto-created).
+- Pass **`full: true`** to bypass truncation and inline every item.
+- `truncated: true` in the response flags which path was taken.
+
+`slog_show` additionally supports:
+- **`summary_only: true`** — return only the aggregate summary (`{ count, elapsed_ms, scan_capped, summary, hint? }`), no entries or spill file. Cheap for aggregate queries like "errors per subsystem in the last hour". Mutually exclusive with `full`.
+- **`limit: N`** (default 500) — caps **retained** entries for `entries`/`head`/`tail`/`output_file`; the summary always reflects the full matched population, scanning up to a 100,000-event ceiling. `scan_capped: true` warns when that ceiling is reached.
+- **`hint`** — populated only when `count == 0`, explains the most likely cause (e.g. custom subsystems don't persist debug events by default — use `slog_stream` for live capture).
+
+`slog_stream` additionally surfaces `captured`, `requested`, and `stopped_by` (`count` / `timeout` / `exhausted` / `error`).
 
 ### AI Agent Skill
 

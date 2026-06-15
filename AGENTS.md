@@ -36,7 +36,8 @@ slog/
 │   │   ├── FilterSetup.swift           # Predicate + filter chain + auto-debug builder
 │   │   └── Predicates.swift            # 10+ composable predicate types
 │   ├── MCP/
-│   │   └── SlogTools.swift             # 5 MCP tool definitions reusing core logic
+│   │   ├── SlogTools.swift             # 5 MCP tool definitions reusing core logic
+│   │   └── SlogResultEnvelope.swift    # ResultSummary, NDJSONSpill, envelope builders
 │   └── Output/                         # Formatters
 │       ├── Formatter.swift             # Protocol, registry, OutputFormat enum
 │       ├── FormattedEntry.swift        # Shared Encodable model for JSON/TOON
@@ -103,7 +104,7 @@ Six subcommands. `stream` is the default (can be omitted).
 
 ### Streaming & Querying
 - **stream** — Stream live logs. Filters: `--process`, `--subsystem`, `--category` (each comma-separated for multiple values, OR-matched), `--level`, `--grep`, `--exclude-grep`. Output: `--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`. Bounded capture: `--timeout`, `--capture`, `--count`.
-- **show** — Query historical logs. Requires `--last`, `--start`, or archive path. Same filters and output options as stream.
+- **show** — Query historical logs. Requires `--last`, `--start`, or archive path. Same filters and output options as stream, plus `--limit <n>` to cap displayed entries (`show` uses `--limit`, not `--count`).
 
 ### Configuration
 - **profile** — CRUD for saved filter/format profiles. `create`, `list`, `show`, `delete`. Use `--profile <name>` on stream/show.
@@ -114,6 +115,17 @@ Six subcommands. `stream` is the default (can be omitted).
 ### System
 - **doctor** — Check system requirements (log CLI, stream/archive access, simctl, profiles dir).
 - **mcp** — Start MCP server. `--setup` for integration instructions.
+
+## MCP Response Envelope
+
+Large-result MCP tools (`slog_show`, `slog_stream`, `slog_list_processes`) share a single truncation contract implemented in `MCP/SlogResultEnvelope.swift`:
+
+- ≤50 items → returned fully inline.
+- &gt;50 items → response carries `summary` (where applicable) plus `head` and `tail` samples (10 each), with the full payload written as NDJSON to `output_file`. Default spill path is `$XDG_CACHE_HOME/slog/runs/<prefix>-<UTC stamp>.ndjson`; callers can override with an explicit `output_file` arg.
+- `full: true` inlines every item, bypassing truncation.
+- `slog_show` additionally supports `summary_only: true` (return just the aggregate, no entries/file) and exposes `scan_capped: true` when the 100,000-event scan ceiling is hit. Its `limit` arg caps **retained** entries only — the summary always reflects the full matched population.
+
+`ResultEnvelopeBuilder` is `LogEntry`-specific (it computes a `ResultSummary`); `ListEnvelopeBuilder<T: Encodable>` handles list-style tools that don't need a summary.
 
 ## Testing
 

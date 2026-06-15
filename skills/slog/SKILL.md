@@ -6,76 +6,38 @@ argument-hint: [command]
 
 # slog — macOS/iOS Log Streaming CLI
 
-Use `slog` to stream, query, and filter macOS and iOS Simulator logs. It wraps Apple's `log` CLI to provide enhanced filtering, multiple output formats, and time-bounded capture for automation.
+`slog` wraps Apple's `log` CLI with enhanced filtering, multiple output formats, and bounded capture for automation.
 
-Help the user construct the right slog command for their needs.
+Help the user build the right invocation.
 
 ## Quick Workflow
 
 ```bash
-# 1. Check system requirements
-slog doctor
-
-# 2. Find the process you want to monitor
-slog list processes --filter MyApp
-
-# 3. Stream live logs from it
-slog stream --process MyApp
-
-# 4. Narrow down with filters
-slog stream --process MyApp --subsystem com.myapp.network --level error
-
-# 5. Query recent historical logs
-slog show --last 5m --process MyApp --format json
-
-# 6. Save a reusable profile
+slog doctor                                    # verify system
+slog list processes --filter MyApp             # find process names
+slog stream --process MyApp                    # live stream
+slog show --last 5m --process MyApp --level error --format json
 slog profile create myapp --process MyApp --subsystem com.myapp --format compact
-slog stream --profile myapp
+slog stream --profile myapp                    # reuse
 ```
 
-## Commands Reference
+## Commands
 
-### `slog stream` — Stream live logs (default command)
+### `slog stream` — live logs (default command, can be omitted)
 
 ```bash
 slog stream [options]
-slog [options]  # equivalent — stream is the default command
 ```
 
-**Target:**
-- `--process <name>` — filter by process name. Comma-separated for multiple (OR-matched): `--process Finder,Dock`
-- `--pid <id>` — filter by process ID
-- `--simulator` — stream from iOS Simulator
-- `--simulator-udid <udid>` — specific Simulator UDID (auto-detects if one is booted)
+**Target:** `--process <name>` · `--pid <id>` · `--simulator` · `--simulator-udid <udid>` (auto-detects if one is booted)
 
-**Filters:**
-- `--subsystem <name>` — e.g. `com.apple.network`. Comma-separated for multiple (OR-matched): `--subsystem com.apple.network,com.apple.CFNetwork`
-- `--category <name>` — filter by category. Comma-separated for multiple (OR-matched): `--category http,dns`
-- `--level <level>` — minimum level: `debug`, `info`, `default`, `error`, `fault`
-- `--grep <pattern>` — regex filter on message content
-- `--exclude-grep <pattern>` — exclude messages matching regex
+**Filters:** `--subsystem <name>` · `--category <name>` · `--level <debug|info|default|error|fault>` · `--grep <regex>` · `--exclude-grep <regex>`
 
-**Output:**
-- `--format <fmt>` — `plain`, `compact`, `color` (default), `json`, `toon`
-- `--time <mode>` — timestamp mode: `absolute` (default), `relative`
-- `--info` / `--no-info` — include info-level messages
-- `--debug` / `--no-debug` — include debug-level messages
-- `--source` / `--no-source` — include source location info
-- `--dedup` / `--no-dedup` — collapse consecutive identical messages
+`--process`, `--subsystem`, `--category` accept comma-separated multi-values (OR-matched), e.g. `--process Finder,Dock`.
 
-**Bounded capture (for scripts/automation):**
-- `--timeout <duration>` — max wait for first log (exits code 1 if exceeded)
-- `--capture <duration>` — capture duration after first log arrives
-- `--count <n>` — number of entries to capture
+**Output:** `--format <plain|compact|color|json|toon>` · `--time <absolute|relative>` · `--info`/`--no-info` · `--debug`/`--no-debug` · `--source`/`--no-source` · `--dedup`/`--no-dedup`
 
-Duration format: `5s`, `30s`, `2m`, `1h` (seconds assumed if no suffix).
-
-```bash
-$ slog stream --process Finder --format color
-21:46:22.908 [DEFAULT] Finder[21162] (com.apple.finder:) Starting sync
-21:46:22.910 [ERROR] Finder[21162] (com.apple.finder:) Connection failed
-21:46:22.912 [INFO] Finder[21162] (com.apple.finder:) Retry scheduled
-```
+**Bounded capture (for automation):** `--timeout <duration>` (max wait for first log, exits 1 on miss) · `--capture <duration>` (after first log) · `--count <n>`. Duration: `5s`, `30s`, `2m`, `1h`.
 
 ```bash
 $ slog stream --process MyApp --format json --count 2
@@ -83,166 +45,101 @@ $ slog stream --process MyApp --format json --count 2
 {"category":"general","level":"Error","message":"Network timeout","pid":1234,"process":"MyApp","subsystem":"com.myapp","timestamp":"2026-01-15T10:30:01Z"}
 ```
 
-### `slog show` — Query historical logs
+### `slog show` — historical logs
 
 ```bash
 slog show [options] [archive-path]
 ```
 
-**Time range (at least one required unless archive-path given):**
-- `--last <duration|boot>` — e.g. `5m`, `1h`, `boot`
-- `--start <date>` — e.g. `"2024-01-15 10:30:00"`
-- `--end <date>` — e.g. `"2024-01-15 11:00:00"`
+**Time range (one required unless `archive-path` given):** `--last <5m|1h|boot>` · `--start <date>` · `--end <date>`. `--last` and `--start`/`--end` are mutually exclusive.
 
-`--last` and `--start`/`--end` are mutually exclusive.
+**Filters:** same as stream.
 
-**Filters:** same as stream (`--process`, `--pid`, `--subsystem`, `--category`, `--level`, `--grep`, `--exclude-grep`).
-
-**Output:** same as stream (`--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`) plus `--limit <n>` to cap displayed entries.
+**Output:** same as stream plus `--limit <n>` to cap displayed entries (note: show uses `--limit`, stream uses `--count`).
 
 ```bash
 $ slog show --last 5m --process Finder --level error
 21:46:22.910 [ERROR] Finder[21162] (com.apple.finder:) Connection failed
 ```
 
-```bash
-$ slog show /path/to/file.logarchive --format toon
-```
+### `slog profile` — saved filter profiles
 
-### `slog profile` — Manage saved filter profiles
-
-Profiles are stored as JSON in `$XDG_CONFIG_HOME/slog/profiles/` (defaults to `~/.config/slog/profiles/`).
+Stored in `$XDG_CONFIG_HOME/slog/profiles/` (defaults to `~/.config/slog/profiles/`).
 
 ```bash
-slog profile create <name> [options]   # Create from CLI flags (--force to overwrite)
-slog profile list                      # List profiles
-slog profile show <name>               # Show profile contents
-slog profile delete <name>             # Delete a profile
+slog profile create <name> [options]    # --force to overwrite
+slog profile list | show <name> | delete <name>
 ```
 
-Use with `--profile <name>` on `stream` or `show`. CLI args override profile values. Use `--no-info`, `--no-debug`, `--no-source` to explicitly disable profile flags.
+Apply with `--profile <name>` on `stream`/`show`. CLI args override profile values. Use `--no-info`/`--no-debug`/`--no-source` to disable profile flags.
+
+### `slog list` — processes / simulators
 
 ```bash
-$ slog profile create myapp --process MyApp --subsystem com.myapp --level debug --format compact
-Created profile 'myapp'
-
-$ slog stream --profile myapp
-$ slog stream --profile myapp --level error --format json
+slog list processes [--filter <name>]
+slog list simulators [--booted] [--all]
 ```
 
-### `slog list` — List processes and simulators
-
-```bash
-slog list processes [--filter <name>]     # List running processes
-slog list simulators [--booted] [--all]   # List iOS Simulators
-```
-
-```bash
-$ slog list processes --filter finder
-Finder (21162)
-
-$ slog list simulators --booted
-iPhone 16e (Booted)  ABC-123-DEF  iOS 18.4
-```
-
-### `slog doctor` — Check system requirements
+### `slog doctor` — check system requirements
 
 ```bash
 $ slog doctor
-slog doctor
-
-  [OK] log CLI (/usr/bin/log)
-  [OK] Log stream access
-  [OK] Log archive access (log show)
-  [OK] Simulator support (xcrun simctl)
-  [OK] Profiles directory (/Users/alex/.config/slog/profiles)
-
-All checks passed. slog is ready to use.
+  [OK] log CLI · Log stream access · Log archive access · Simulator support · Profiles directory
+All checks passed.
 ```
 
-### `slog mcp` — Start MCP server
+### `slog mcp` — start MCP server (stdio)
 
 ```bash
-slog mcp            # Start MCP server (stdio transport)
-slog mcp --setup    # Print integration instructions
+slog mcp [--setup]    # --setup prints integration instructions
 ```
 
-Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`.
+Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`. `process`/`subsystem`/`category` accept JSON arrays (OR-matched).
 
-In `slog_show` and `slog_stream`, `process`, `subsystem`, and `category` accept JSON arrays (OR-matched), e.g. `{"process": ["Finder", "Dock"]}`. The CLI uses comma-separated strings for the same effect.
+**Response envelope** (shared by `slog_show`/`slog_stream`/`slog_list_processes`):
+- ≤50 items → fully inline (`entries`/`processes`).
+- &gt;50 items → `summary` (where applicable) + `head`/`tail` (10 each) + `output_file` (full payload as NDJSON). **Read with `Read offset/limit` or `jq`; don't slurp.**
+- `output_file: "<path>"` overrides spill destination (default `$XDG_CACHE_HOME/slog/runs/`).
+- `full: true` inlines everything.
+- `truncated: true` flags which path was taken.
+
+**`slog_show` extras:**
+- `summary_only: true` → just `{ count, elapsed_ms, scan_capped, summary, hint? }`. Best for aggregate questions. Mutex with `full`.
+- `limit: N` (default 500) caps **retained** entries; summary always covers the full population, scanning up to 100k events. `scan_capped: true` → narrow the window.
+- `hint` appears only when `count == 0`.
+
+**`slog_stream` extras:** `captured`, `requested`, `stopped_by` (`count` | `timeout` | `exhausted` | `error`).
 
 ## Filtering Strategies
 
-When debugging log output, use this efficient approach:
-
-1. **Start broad, then narrow**: First stream by process, then add subsystem/level filters
-   ```bash
-   # See all logs from your app
-   slog stream --process MyApp
-   # Then narrow to network errors
-   slog stream --process MyApp --subsystem com.myapp.network --level error
-   ```
-
-2. **Use grep for message-level filtering**: Combine server-side predicates with client-side regex
-   ```bash
-   # Find timeout-related errors
-   slog stream --process MyApp --level error --grep "timeout|connection"
-   # Exclude noisy heartbeat logs
-   slog stream --process MyApp --exclude-grep "heartbeat|keepalive"
-   ```
-
-   `--process`, `--subsystem`, and `--category` each accept comma-separated values that are OR-matched server-side:
-   ```bash
-   slog stream --process Finder,Dock
-   slog show --last 1h --subsystem com.apple.network,com.apple.CFNetwork
-   slog stream --process MyApp --category http,dns
-   ```
-
-3. **Use profiles for repeated queries**: Save complex filter combinations
-   ```bash
-   slog profile create network-debug --process MyApp --subsystem com.myapp.network --level debug --format compact
-   slog stream --profile network-debug
-   ```
-
-4. **Use show for post-mortem analysis**: Query historical logs after an issue
-   ```bash
-   # What happened in the last 5 minutes?
-   slog show --last 5m --process MyApp --level error
-   # Check logs around a specific time
-   slog show --start "2026-01-15 10:30:00" --end "2026-01-15 10:35:00" --process MyApp
-   ```
-
-5. **Use bounded capture for automation**: Integrate slog into scripts and CI
-   ```bash
-   # Capture 10 errors or timeout after 30s
-   slog stream --process MyApp --level error --count 10 --timeout 30s --format json
-   ```
+1. **Start broad, narrow down.** Process → add subsystem/level/grep.
+2. **Combine server + client filters.** Predicate (`--process`, `--subsystem`, `--category`, `--level`) runs server-side; `--grep`/`--exclude-grep` run on the message after retrieval.
+3. **OR multiple values.** `--process Finder,Dock`, `--subsystem com.apple.network,com.apple.CFNetwork`.
+4. **Save profiles** for repeated combinations.
+5. **`show` for post-mortem, `stream` for live + debug events.** Custom subsystems don't persist debug events by default — `show` won't see them.
 
 ## Output Formats
 
-All commands support structured output formats via `--format`:
-- `color` — ANSI-colored output with full details (default)
-- `plain` — Same as color without ANSI codes (for file output/piping)
-- `compact` — Minimal: timestamp, level, message only
-- `json` — Newline-delimited JSON for programmatic use
-- `toon` — Token-Optimized Object Notation for LLM consumption (recommended for AI agents, uses fewer tokens than JSON)
+- `color` (default) — ANSI-colored, full details
+- `plain` — same as color, no ANSI
+- `compact` — timestamp + level + message only
+- `json` — NDJSON for piping (`| jq '.message'`)
+- `toon` — TOON, fewer tokens than JSON
 
-**Always use `--format toon` for AI agent workflows.** It provides the same data as JSON with significantly fewer tokens.
+**Use `--format toon` for AI agent workflows.**
 
 ## Key Behaviors
 
-- **Auto-debug**: When filtering by `--subsystem`, debug+info logs are automatically included. Override with explicit `--level`, `--info`, or `--debug`.
-- **Log levels** (most to least verbose): `debug` (0), `info` (1), `default` (2), `error` (16), `fault` (17).
-- **Exit codes**: 0 = capture complete or user interrupt; 1 = timeout or stream error.
-- **Dedup**: Use `--dedup` to collapse consecutive identical messages into "message (xN)".
-- **Relative timestamps**: Use `--time relative` to see time deltas between log entries instead of absolute timestamps.
+- **Auto-debug:** filtering by `--subsystem` auto-includes debug+info. Override with `--level`/`--info`/`--debug`.
+- **Levels** (least→most verbose): `debug`, `info`, `default`, `error`, `fault`.
+- **Exit codes:** 0 = capture complete or user interrupt · 1 = timeout or stream error.
+- **Dedup:** `--dedup` collapses consecutive identical messages into "message (xN)".
+- **Relative timestamps:** `--time relative` shows deltas between entries.
 
 ## Tips
 
-- Prefer `--format toon` for AI agent workflows to reduce token usage.
-- Use `slog show --last boot` to see all logs since the last system boot.
-- Combine `--grep` and `--exclude-grep` for precise message filtering.
-- Bound the output for analysis: `slog show --limit N --format json` or `slog stream --count N --format json`.
-- Profiles persist filter settings — use `--profile` to avoid retyping complex flag combinations.
-- `--source` adds file/function/line info when available (requires the logging framework to emit it).
-- When piping to `jq`, use `--format json`: `slog stream --process MyApp --format json | jq '.message'`.
+- `--format toon` for agent workflows.
+- `slog show --last boot` for all logs since last boot.
+- Bound for analysis: `slog show --limit N --format json` or `slog stream --count N --format json`.
+- Profiles avoid retyping complex flag combos.
+- `--source` adds file/function/line info when emitted by the logger.
