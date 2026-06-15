@@ -110,7 +110,7 @@ Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_s
 - `next_since` (always in the response, `null` when 0 matches) = latest matched timestamp + 1µs. **For tailing, pass it back as the next `start` to fetch only what's new** — works in `summary_only` too.
 - `hint` appears only when `count == 0`.
 
-**`slog_stream` extras:** `captured`, `requested`, `stopped_by` (`count` | `timeout` | `exhausted` | `error`). `count` is optional (1–1000) — omit it to capture until `timeout`, implicitly capped at 1000.
+**`slog_stream` extras:** `captured`, `requested`, `stopped_by` (`count` | `timeout` | `exhausted` | `error`). `count` is optional (1–1000) — omit it to capture until `timeout`, implicitly capped at 1000. When `stopped_by == "error"` the response includes `error_message` (raw failure text); if `captured == 0` it also carries `try_doctor: true` (zero output usually means the stream never opened — call `slog_doctor`).
 
 **Errors.** Failure payloads are `{ "error": "<message>" }`. When the failure is system-level (log CLI missing, permission denied, simctl unavailable, no booted simulator), the payload also carries `"try_doctor": true` — call `slog_doctor` once and surface its output before retrying. Validation/user errors (bad args, mutex violations, missing `source_file`) don't carry the flag — doctor won't help.
 

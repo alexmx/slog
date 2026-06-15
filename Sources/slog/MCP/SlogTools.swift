@@ -122,6 +122,13 @@ struct StreamResult: Encodable {
     let head: [LogEntry]?
     let tail: [LogEntry]?
     let outputFile: String?
+    /// Underlying failure description when `stoppedBy == "error"`. Lets agents
+    /// distinguish "stream crashed" from "no matches" without parsing log noise.
+    let errorMessage: String?
+    /// Set when `stoppedBy == "error"` AND `captured == 0` — heuristic for
+    /// "stream never opened, probably system/permission level." Mid-flight
+    /// failures (some entries captured) skip the flag since doctor won't help.
+    let tryDoctor: Bool?
 
     enum CodingKeys: String, CodingKey {
         case captured
@@ -134,6 +141,8 @@ struct StreamResult: Encodable {
         case stoppedBy = "stopped_by"
         case elapsedMs = "elapsed_ms"
         case outputFile = "output_file"
+        case errorMessage = "error_message"
+        case tryDoctor = "try_doctor"
     }
 }
 
@@ -564,7 +573,10 @@ enum SlogTools {
 
         When `captured == 0`, inspect `elapsed_ms` and `stopped_by` before retrying with a wider window.
 
-        On system-level failure (simctl missing, no booted simulator, etc.) the error payload \
+        When `stopped_by == "error"`, the response carries `error_message` (raw failure text); \
+        if also `captured == 0`, `try_doctor: true` flags a likely system/permission cause.
+
+        On startup failure (simctl missing, no booted simulator, etc.) the error payload \
         includes `try_doctor: true` — call `slog_doctor` once and surface its findings before retrying.
         """
     ) { (args: StreamArgs) in
@@ -651,9 +663,18 @@ enum SlogTools {
 
         let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
         let captured = container.count
+
+        // Pull the failure out of streamTask.result so we can surface it on the
+        // response — otherwise the agent sees `stopped_by: "error"` with zero
+        // diagnostic info and has nothing to act on.
+        var streamFailure: Error?
+        if case let .failure(error) = streamResult, !(error is CancellationError) {
+            streamFailure = error
+        }
+
         let stoppedBy = if timedOut.get() {
             "timeout"
-        } else if case .failure = streamResult {
+        } else if streamFailure != nil {
             "error"
         } else if captured >= count {
             "count"
@@ -674,6 +695,12 @@ enum SlogTools {
             return errorJSON(error.localizedDescription)
         }
 
+        // try_doctor heuristic: zero captured + error means the stream never
+        // opened (system/permission level). Any captured entries imply the
+        // stream worked initially and the error is transient/mid-flight.
+        let errorMessage = streamFailure?.localizedDescription
+        let tryDoctor = (streamFailure != nil && captured == 0) ? true : nil
+
         let result = StreamResult(
             captured: captured,
             requested: count,
@@ -684,7 +711,9 @@ enum SlogTools {
             entries: envelope.inlineEntries,
             head: envelope.head,
             tail: envelope.tail,
-            outputFile: envelope.outputFile?.path
+            outputFile: envelope.outputFile?.path,
+            errorMessage: errorMessage,
+            tryDoctor: tryDoctor
         )
         return try json(result)
     }
