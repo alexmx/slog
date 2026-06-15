@@ -379,6 +379,23 @@ struct SummaryAccumulatorTests {
         #expect(summary.byLevel.isEmpty)
         #expect(summary.topProcesses.isEmpty)
     }
+
+    @Test("lastTimestamp tracks the most recently added entry — fuels next_since chaining")
+    func lastTimestampForTailing() {
+        var accumulator = SummaryAccumulator()
+        #expect(accumulator.lastTimestamp == nil)
+
+        let e1 = entry(0, process: "A", subsystem: nil, level: .default)
+        let e2 = entry(10, process: "A", subsystem: nil, level: .default)
+        accumulator.add(e1)
+        accumulator.add(e2)
+
+        #expect(accumulator.lastTimestamp == e2.timestamp)
+        // The handler computes next_since = lastTimestamp + 1µs; verify the offset
+        // lands strictly after the boundary event so the next call doesn't re-pull it.
+        let nextSince = accumulator.lastTimestamp!.addingTimeInterval(0.000_001)
+        #expect(nextSince > e2.timestamp)
+    }
 }
 
 @Suite("ResultSummary Tests")

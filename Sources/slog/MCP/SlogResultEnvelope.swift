@@ -69,8 +69,8 @@ struct ResultSummary: Encodable {
 /// `LogEntry` in memory. Used by `slog_show` to scan past the `count` cap for
 /// aggregate accuracy.
 struct SummaryAccumulator {
-    private var firstTimestamp: Date?
-    private var lastTimestamp: Date?
+    private(set) var firstTimestamp: Date?
+    private(set) var lastTimestamp: Date?
     private var levels: [String: Int] = [:]
     private var processes: [String: Int] = [:]
     private var subsystems: [String: Int] = [:]

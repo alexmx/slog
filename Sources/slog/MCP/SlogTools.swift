@@ -65,6 +65,7 @@ struct ShowResult: Encodable {
     let head: [LogEntry]?
     let tail: [LogEntry]?
     let outputFile: String?
+    let nextSince: Date?
     let hint: String?
 
     enum CodingKeys: String, CodingKey {
@@ -78,6 +79,7 @@ struct ShowResult: Encodable {
         case elapsedMs = "elapsed_ms"
         case outputFile = "output_file"
         case scanCapped = "scan_capped"
+        case nextSince = "next_since"
     }
 }
 
@@ -322,6 +324,10 @@ enum SlogTools {
         to re-filter/re-summarize the NDJSON spill without re-scanning the OS log database. \
         Same filter args apply; mutex with `last`/`start`/`end`/`archive_path`.
 
+        **Tailing:** every response includes `next_since` (latest matched timestamp + 1µs, \
+        or null if no matches). Chain calls by passing it as the next `start` to fetch only \
+        what's new; works in `summary_only` mode too.
+
         Response: `{ count, elapsed_ms, scan_capped, truncated, summary, entries?, head?, tail?, output_file?, hint? }`.
           - ≤50 entries → inline as `entries`.
           - >50 entries → `summary` (time range, by_level, top processes/subsystems/categories) + `head`/`tail` (10 each) + full payload as NDJSON at `output_file`. Drill in with `Read offset/limit` or `jq`; do not slurp.
@@ -440,6 +446,10 @@ enum SlogTools {
         let matched = accumulator.count
         let summary = matched == 0 ? nil : accumulator.build()
         let hint = matched == 0 ? emptyShowHint(args: args) : nil
+        // +1µs past the latest matched event so the next tailing call doesn't
+        // re-pull the boundary entry. Null when there were no matches — caller
+        // reuses their previous `since`.
+        let nextSince = accumulator.lastTimestamp.map { $0.addingTimeInterval(0.000_001) }
 
         if summaryOnly {
             return try json(ShowResult(
@@ -452,6 +462,7 @@ enum SlogTools {
                 head: nil,
                 tail: nil,
                 outputFile: nil,
+                nextSince: nextSince,
                 hint: hint
             ))
         }
@@ -478,6 +489,7 @@ enum SlogTools {
             head: envelope.head,
             tail: envelope.tail,
             outputFile: envelope.outputFile?.path,
+            nextSince: nextSince,
             hint: hint
         ))
     }

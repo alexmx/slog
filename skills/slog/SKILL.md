@@ -104,9 +104,10 @@ Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_s
 - `truncated: true` flags which path was taken.
 
 **`slog_show` extras:**
-- `summary_only: true` → just `{ count, elapsed_ms, scan_capped, summary, hint? }`. Best for aggregate questions. Mutex with `full`.
+- `summary_only: true` → just `{ count, elapsed_ms, scan_capped, summary, next_since?, hint? }`. Best for aggregate questions. Mutex with `full`.
 - `limit: N` (default 500) caps **retained** entries; summary always covers the full population, scanning up to 100k events. `scan_capped: true` → narrow the window.
 - `source_file: "<path>"` re-queries a previous `output_file` instead of the OS log database — same filters, same envelope, milliseconds instead of seconds. Use for iterative drill-down. Mutex with `last`/`start`/`end`/`archive_path` and with `output_file == source_file`.
+- `next_since` (always in the response, `null` when 0 matches) = latest matched timestamp + 1µs. **For tailing, pass it back as the next `start` to fetch only what's new** — works in `summary_only` too.
 - `hint` appears only when `count == 0`.
 
 **`slog_stream` extras:** `captured`, `requested`, `stopped_by` (`count` | `timeout` | `exhausted` | `error`). `count` is optional (1–1000) — omit it to capture until `timeout`, implicitly capped at 1000.

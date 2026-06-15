@@ -85,7 +85,7 @@ Shared by `slog_show`, `slog_stream`, `slog_list_processes` (in `MCP/SlogResultE
 
 - ≤50 items → inline. >50 items → `summary` (where applicable) + `head`/`tail` (10 each) + NDJSON spill at `output_file` (default `$XDG_CACHE_HOME/slog/runs/`).
 - `full: true` → inline everything.
-- `slog_show` extras: `summary_only: true` (just the aggregate); `source_file: "<path>"` (re-query a previous spill, skip the OS scan); `scan_capped: true` when the 100k-event ceiling is hit. `limit` caps **retained** entries; summary always covers the full matched population.
+- `slog_show` extras: `summary_only: true` (just the aggregate); `source_file: "<path>"` (re-query a previous spill, skip the OS scan); `next_since` in every response (latest matched timestamp + 1µs) for tailing — pass back as next `start`; `scan_capped: true` when the 100k-event ceiling is hit. `limit` caps **retained** entries; summary always covers the full matched population.
 - `slog_stream.count` is optional (1–1000); omit to capture until `timeout`, capped at 1000.
 
 `ResultEnvelopeBuilder` is `LogEntry`-specific (computes `ResultSummary`); `ListEnvelopeBuilder<T: Encodable>` handles list-style tools without a summary.
