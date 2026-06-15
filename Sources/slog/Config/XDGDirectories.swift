@@ -28,4 +28,27 @@ enum XDGDirectories {
     static var profilesDirectory: URL {
         slogConfig.appendingPathComponent("profiles")
     }
+
+    /// User-specific cache directory.
+    /// Uses `$XDG_CACHE_HOME` if set and absolute, otherwise `~/.cache`.
+    static var cacheHome: URL {
+        if let xdg = ProcessInfo.processInfo.environment["XDG_CACHE_HOME"],
+           xdg.hasPrefix("/") {
+            return URL(fileURLWithPath: xdg)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".cache")
+    }
+
+    /// slog cache directory (`$XDG_CACHE_HOME/slog`).
+    static var slogCache: URL {
+        cacheHome.appendingPathComponent("slog")
+    }
+
+    /// MCP run output directory (`$XDG_CACHE_HOME/slog/runs`).
+    /// Used when a tool spills full results to disk and the caller didn't
+    /// supply `output_file`.
+    static var runsDirectory: URL {
+        slogCache.appendingPathComponent("runs")
+    }
 }

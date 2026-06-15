@@ -48,42 +48,88 @@ class SendableEntryContainer: @unchecked Sendable {
     }
 }
 
-/// Response shape for `slog_show`. Mirrors `StreamResult` so callers can
-/// tell an empty result from a misconfigured filter — `hint` is populated
-/// only when `count == 0` and we can guess why (custom-subsystem debug
-/// persistence, process-only query, too-short window).
+/// Response shape for `slog_show`. Defaults to a token-cheap envelope:
+/// `summary` plus a `head`/`tail` sample with the full payload spilled to
+/// `output_file` as NDJSON. Set `full: true` (or stay under the inline
+/// threshold) to get all entries inline instead.
+///
+/// `hint` is populated only when `count == 0` and we can guess why
+/// (custom-subsystem debug persistence, process-only query, too-short window).
 struct ShowResult: Encodable {
-    let entries: [LogEntry]
     let count: Int
     let elapsedMs: Int
+    let truncated: Bool
+    let summary: ResultSummary?
+    let entries: [LogEntry]?
+    let head: [LogEntry]?
+    let tail: [LogEntry]?
+    let outputFile: String?
     let hint: String?
 
     enum CodingKeys: String, CodingKey {
-        case entries
         case count
+        case truncated
+        case summary
+        case entries
+        case head
+        case tail
         case hint
         case elapsedMs = "elapsed_ms"
+        case outputFile = "output_file"
     }
 }
 
-/// Response shape for `slog_stream`. Wraps entries with diagnostic metadata
-/// so callers can tell whether an empty result means "nothing matched in the
-/// time window" (`stoppedBy: timeout`) vs "filter caught nothing and the stream
-/// itself closed" (`exhausted`).
+/// Response shape for `slog_list_processes`. Same truncation contract as
+/// `ShowResult` (small results inline as `processes`; large results truncate
+/// to `head`/`tail` with the full list spilled as NDJSON to `output_file`).
+/// `filter` lets callers narrow before they ever hit the threshold.
+struct ProcessListResult: Encodable {
+    let count: Int
+    let truncated: Bool
+    let processes: [RunningProcess]?
+    let head: [RunningProcess]?
+    let tail: [RunningProcess]?
+    let outputFile: String?
+
+    enum CodingKeys: String, CodingKey {
+        case count
+        case truncated
+        case processes
+        case head
+        case tail
+        case outputFile = "output_file"
+    }
+}
+
+/// Response shape for `slog_stream`. Same truncation contract as `ShowResult`
+/// (see above) plus stream-specific diagnostics: `stoppedBy` tells callers
+/// whether an empty result means "nothing matched in the time window"
+/// (`timeout`) or "stream itself closed before the count was reached"
+/// (`exhausted`).
 struct StreamResult: Encodable {
-    let entries: [LogEntry]
     let captured: Int
     let requested: Int
     /// `count` (reached requested limit) | `timeout` | `exhausted` | `error`
     let stoppedBy: String
     let elapsedMs: Int
+    let truncated: Bool
+    let summary: ResultSummary?
+    let entries: [LogEntry]?
+    let head: [LogEntry]?
+    let tail: [LogEntry]?
+    let outputFile: String?
 
     enum CodingKeys: String, CodingKey {
-        case entries
         case captured
         case requested
+        case truncated
+        case summary
+        case entries
+        case head
+        case tail
         case stoppedBy = "stopped_by"
         case elapsedMs = "elapsed_ms"
+        case outputFile = "output_file"
     }
 }
 
@@ -195,6 +241,16 @@ enum SlogTools {
 
         @InputProperty("Path to a .logarchive file (alternative to last/start)")
         var archive_path: String?
+
+        @InputProperty(
+            "Path to write the full result set as NDJSON (one entry per line). When omitted and the result exceeds the inline threshold, writes to `$XDG_CACHE_HOME/slog/runs/`. Use `Read offset/limit` or `jq` on this file to drill in."
+        )
+        var output_file: String?
+
+        @InputProperty(
+            "Return every entry inline instead of the default summary+head+tail envelope. Off by default — only set this when you genuinely need the full payload in the response."
+        )
+        var full: Bool?
     }
 
     struct StreamArgs: MCPToolInput {
@@ -238,11 +294,31 @@ enum SlogTools {
 
         @InputProperty("Simulator UDID (auto-detects if only one booted). Use slog_list_simulators to find UDIDs.")
         var simulator_udid: String?
+
+        @InputProperty(
+            "Path to write the full result set as NDJSON (one entry per line). When omitted and the result exceeds the inline threshold, writes to `$XDG_CACHE_HOME/slog/runs/`. Use `Read offset/limit` or `jq` on this file to drill in."
+        )
+        var output_file: String?
+
+        @InputProperty(
+            "Return every entry inline instead of the default summary+head+tail envelope. Off by default — only set this when you genuinely need the full payload in the response."
+        )
+        var full: Bool?
     }
 
     struct ListProcessesArgs: MCPToolInput {
         @InputProperty("Filter processes by name (case-insensitive). Omit to list all running processes.")
         var filter: String?
+
+        @InputProperty(
+            "Path to write the full process list as NDJSON (one entry per line). When omitted and the result exceeds the inline threshold, writes to `$XDG_CACHE_HOME/slog/runs/`."
+        )
+        var output_file: String?
+
+        @InputProperty(
+            "Return every process inline instead of the default truncated head+tail envelope. Off by default — set this only when you need the full list in the response."
+        )
+        var full: Bool?
     }
 
     struct ListSimulatorsArgs: MCPToolInput {
@@ -260,16 +336,23 @@ enum SlogTools {
         description: """
         Query historical/persisted macOS logs. **Use this for post-mortem analysis** — \
         investigating what happened in the recent past.
-        
+
         Requires one time source: `last` ('5m', '1h', 'boot'), `start`/`end` date range, \
         or `archive_path`. Start with broad filters (process only), then narrow with \
         subsystem/level/grep. Filtering by `subsystem` auto-includes debug+info; \
         otherwise only default+ levels are returned.
-        
-        Returns `{ entries, count, elapsed_ms, hint? }`. The optional `hint` appears \
-        only when `count == 0` and explains the most likely cause (e.g. custom-subsystem \
-        debug persistence, process-only query, time window too short).
-        
+
+        **Response shape (default):** `{ count, elapsed_ms, truncated, summary, entries?, head?, tail?, output_file?, hint? }`. \
+        Small result sets (≤50 entries) come back fully inline as `entries`. Larger sets \
+        are truncated by default: `summary` (time range, by-level counts, top processes/\
+        subsystems/categories), plus `head` and `tail` samples (10 each), and the complete \
+        payload written as NDJSON to `output_file`. Read that file selectively with `Read \
+        offset/limit` or `jq` — do NOT slurp the whole file unless you actually need it. \
+        Set `full: true` to bypass truncation and inline every entry. Supply `output_file` \
+        to control where the NDJSON lands; otherwise it goes under `$XDG_CACHE_HOME/slog/runs/`.
+
+        The optional `hint` appears only when `count == 0` and explains the most likely cause.
+
         **Note on debug events:** Custom (non-Apple) subsystems do not persist debug-level \
         events by default — `log show` cannot replay them after the fact, even with --debug. \
         If you see 0 results from a subsystem you know is logging, use `slog_stream` for \
@@ -339,10 +422,27 @@ enum SlogTools {
         }
 
         let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+        let envelope: ResultEnvelopeBuilder.Output
+        do {
+            envelope = try ResultEnvelopeBuilder(
+                entries: entries,
+                full: args.full ?? false,
+                outputFile: args.output_file,
+                spillPrefix: "show"
+            ).build()
+        } catch {
+            return errorJSON(error.localizedDescription)
+        }
+
         let result = ShowResult(
-            entries: entries,
             count: entries.count,
             elapsedMs: elapsedMs,
+            truncated: envelope.truncated,
+            summary: entries.isEmpty ? nil : envelope.summary,
+            entries: envelope.inlineEntries,
+            head: envelope.head,
+            tail: envelope.tail,
+            outputFile: envelope.outputFile?.path,
             hint: entries.isEmpty ? emptyShowHint(args: args) : nil
         )
         return try json(result)
@@ -378,18 +478,25 @@ enum SlogTools {
         Stream live macOS/iOS logs with bounded capture. **Use this for real-time debugging** \
         and for capturing debug events from your own app's subsystem (which `slog_show` cannot \
         see unless persistence was pre-enabled).
-        
+
         `count` is required and must be 1–1000; the call returns as soon as that many entries \
         match, or `timeout` seconds pass (default 30s), whichever comes first. Start with broad \
         filters (process only), then narrow with subsystem/level/grep. Filtering by `subsystem` \
         auto-includes debug+info. iOS Simulator capture via `simulator: true`.
-        
-        Returns `{ entries, captured, requested, stopped_by, elapsed_ms }`. `stopped_by`:
+
+        **Response shape (default):** `{ captured, requested, stopped_by, elapsed_ms, truncated, summary, entries?, head?, tail?, output_file? }`. \
+        Small captures (≤50 entries) come back fully inline as `entries`. Larger captures are \
+        truncated by default: `summary` plus `head`/`tail` samples, with the complete payload \
+        written as NDJSON to `output_file`. Read that file selectively with `Read offset/limit` \
+        or `jq`. Set `full: true` to inline every entry. Supply `output_file` to control where \
+        the NDJSON lands; otherwise it goes under `$XDG_CACHE_HOME/slog/runs/`.
+
+        `stopped_by`:
           - "count"     — reached `requested` entries (success path)
           - "timeout"   — hit `timeout` seconds without enough matches
           - "exhausted" — stream closed before count/timeout (rare)
           - "error"     — underlying `log stream` failed
-        When `entries` is empty, inspect `elapsed_ms` and `stopped_by` to decide whether to \
+        When `captured == 0`, inspect `elapsed_ms` and `stopped_by` to decide whether to \
         retry with a wider window or a different filter.
         """
     ) { (args: StreamArgs) in
@@ -473,22 +580,70 @@ enum SlogTools {
             "exhausted"
         }
 
+        let collected = container.entries
+        let envelope: ResultEnvelopeBuilder.Output
+        do {
+            envelope = try ResultEnvelopeBuilder(
+                entries: collected,
+                full: args.full ?? false,
+                outputFile: args.output_file,
+                spillPrefix: "stream"
+            ).build()
+        } catch {
+            return errorJSON(error.localizedDescription)
+        }
+
         let result = StreamResult(
-            entries: container.entries,
             captured: captured,
             requested: count,
             stoppedBy: stoppedBy,
-            elapsedMs: elapsedMs
+            elapsedMs: elapsedMs,
+            truncated: envelope.truncated,
+            summary: collected.isEmpty ? nil : envelope.summary,
+            entries: envelope.inlineEntries,
+            head: envelope.head,
+            tail: envelope.tail,
+            outputFile: envelope.outputFile?.path
         )
         return try json(result)
     }
 
     static let listProcesses = MCPTool(
         name: "slog_list_processes",
-        description: "List running macOS processes. **Use this first** to discover process names for filtering with slog_show or slog_stream. Returns JSON array of {name, pid} objects."
+        description: """
+        List running macOS processes. **Use this first** to discover process names for \
+        filtering with slog_show or slog_stream. Use `filter` to narrow by name substring \
+        before truncation kicks in.
+
+        **Response shape:** `{ count, truncated, processes?, head?, tail?, output_file? }`. \
+        Small result sets (≤50 processes) come back fully inline as `processes`. Larger sets \
+        are truncated by default: `head` and `tail` samples (10 each, alphabetical), with the \
+        complete list written as NDJSON to `output_file` — read selectively with `Read \
+        offset/limit` or `jq`. Set `full: true` to inline every process. Supply `output_file` \
+        to control where the NDJSON lands; otherwise it goes under `$XDG_CACHE_HOME/slog/runs/`.
+        """
     ) { (args: ListProcessesArgs) in
         let processes = try SystemQuery.listProcesses(filter: args.filter)
-        return try json(processes)
+        let envelope: ListEnvelopeBuilder<RunningProcess>.Output
+        do {
+            envelope = try ListEnvelopeBuilder(
+                items: processes,
+                full: args.full ?? false,
+                outputFile: args.output_file,
+                spillPrefix: "processes"
+            ).build()
+        } catch {
+            return errorJSON(error.localizedDescription)
+        }
+
+        return try json(ProcessListResult(
+            count: processes.count,
+            truncated: envelope.truncated,
+            processes: envelope.inline,
+            head: envelope.head,
+            tail: envelope.tail,
+            outputFile: envelope.outputFile?.path
+        ))
     }
 
     static let listSimulators = MCPTool(
