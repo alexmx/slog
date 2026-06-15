@@ -116,11 +116,17 @@ struct SummaryAccumulator {
 enum NDJSONSpill {
     enum SpillError: Error, LocalizedError {
         case writeFailed(URL, String)
+        case readFailed(URL, String)
+        case parseError(URL, Int, String)
 
         var errorDescription: String? {
             switch self {
             case let .writeFailed(url, message):
                 "Failed to write NDJSON to \(url.path): \(message)"
+            case let .readFailed(url, message):
+                "Failed to read NDJSON from \(url.path): \(message)"
+            case let .parseError(url, line, message):
+                "Failed to parse NDJSON at \(url.path):\(line): \(message)"
             }
         }
     }
@@ -146,6 +152,48 @@ enum NDJSONSpill {
             try data.write(to: url, options: .atomic)
         } catch {
             throw SpillError.writeFailed(url, error.localizedDescription)
+        }
+    }
+
+    /// Async stream of `LogEntry` decoded one-per-line from an NDJSON file —
+    /// the symmetric reader for spill files written by `write(items:to:)`.
+    /// Surfaces parse failures with the offending line number for fast triage.
+    static func readEntries(from url: URL) -> AsyncThrowingStream<LogEntry, Error> {
+        AsyncThrowingStream { continuation in
+            guard FileManager.default.isReadableFile(atPath: url.path) else {
+                continuation.finish(
+                    throwing: SpillError.readFailed(url, "file not found or unreadable")
+                )
+                return
+            }
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+
+            let task = Task {
+                do {
+                    var lineNumber = 0
+                    for try await line in url.lines {
+                        lineNumber += 1
+                        let trimmed = line.trimmingCharacters(in: .whitespaces)
+                        if trimmed.isEmpty { continue }
+                        guard let data = trimmed.data(using: .utf8) else { continue }
+                        do {
+                            let entry = try decoder.decode(LogEntry.self, from: data)
+                            continuation.yield(entry)
+                        } catch {
+                            continuation.finish(
+                                throwing: SpillError.parseError(url, lineNumber, error.localizedDescription)
+                            )
+                            return
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 

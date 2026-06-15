@@ -206,6 +206,98 @@ struct ListEnvelopeBuilderTests {
     }
 }
 
+@Suite("NDJSONSpill readEntries Tests")
+struct NDJSONSpillReadEntriesTests {
+    private func entry(
+        _ index: Int,
+        process: String = "Test",
+        subsystem: String? = "com.test.sub",
+        level: LogLevel = .default
+    ) -> LogEntry {
+        LogEntry(
+            timestamp: Date(timeIntervalSince1970: TimeInterval(1_700_000_000 + index)),
+            processName: process,
+            pid: 100 + index,
+            subsystem: subsystem,
+            category: "cat",
+            level: level,
+            message: "msg \(index)"
+        )
+    }
+
+    @Test("write → readEntries round-trips LogEntry values")
+    func roundTrip() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("slog-test-\(UUID().uuidString)")
+        let target = tmpDir.appendingPathComponent("spill.ndjson")
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let original = (0..<20).map { entry($0) }
+        try NDJSONSpill.write(items: original, to: target)
+
+        var roundTripped: [LogEntry] = []
+        for try await e in NDJSONSpill.readEntries(from: target) {
+            roundTripped.append(e)
+        }
+        #expect(roundTripped == original)
+    }
+
+    @Test("readEntries surfaces missing-file as SpillError.readFailed")
+    func missingFile() async throws {
+        let missing = FileManager.default.temporaryDirectory
+            .appendingPathComponent("slog-test-missing-\(UUID().uuidString).ndjson")
+
+        do {
+            for try await _ in NDJSONSpill.readEntries(from: missing) {
+                Issue.record("Expected error, got entry")
+            }
+            Issue.record("Expected error, got clean finish")
+        } catch let NDJSONSpill.SpillError.readFailed(url, _) {
+            #expect(url.path == missing.path)
+        } catch {
+            Issue.record("Wrong error: \(error)")
+        }
+    }
+
+    @Test("readEntries surfaces malformed lines with line number")
+    func parseError() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("slog-test-\(UUID().uuidString)")
+        let target = tmpDir.appendingPathComponent("bad.ndjson")
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        try NDJSONSpill.write(items: [entry(0)], to: target)
+        let original = try String(contentsOf: target, encoding: .utf8)
+        let corrupted = original + "{not valid json}\n"
+        try corrupted.write(to: target, atomically: true, encoding: .utf8)
+
+        do {
+            for try await _ in NDJSONSpill.readEntries(from: target) { }
+            Issue.record("Expected parse error")
+        } catch let NDJSONSpill.SpillError.parseError(_, line, _) {
+            #expect(line == 2)
+        } catch {
+            Issue.record("Wrong error: \(error)")
+        }
+    }
+
+    @Test("readEntries skips blank lines without erroring")
+    func skipsBlankLines() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("slog-test-\(UUID().uuidString)")
+        let target = tmpDir.appendingPathComponent("blanks.ndjson")
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        try NDJSONSpill.write(items: [entry(0), entry(1)], to: target)
+        let body = try String(contentsOf: target, encoding: .utf8)
+        try (body + "\n\n").write(to: target, atomically: true, encoding: .utf8)
+
+        var count = 0
+        for try await _ in NDJSONSpill.readEntries(from: target) { count += 1 }
+        #expect(count == 2)
+    }
+}
+
 @Suite("NDJSONSpill Tests")
 struct NDJSONSpillTests {
     @Test("Spill encodes arbitrary Encodable items one per line")

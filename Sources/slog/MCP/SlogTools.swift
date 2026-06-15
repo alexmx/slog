@@ -236,6 +236,9 @@ enum SlogTools {
         @InputProperty("Path to a .logarchive file (alternative to `last`/`start`).")
         var archive_path: String?
 
+        @InputProperty("Re-query a previous `output_file` instead of scanning the OS log database. Cheap iterative drill-down. Mutex with `last`/`start`/`end`/`archive_path`.")
+        var source_file: String?
+
         @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
         var output_file: String?
 
@@ -311,8 +314,13 @@ enum SlogTools {
     static let show = MCPTool(
         name: "slog_show",
         description: """
-        Query historical/persisted macOS logs. Requires one time source: `last`, \
-        `start`/`end`, or `archive_path`. Filtering by `subsystem` auto-includes debug+info.
+        Query historical/persisted macOS logs. Requires one source: `last`, \
+        `start`/`end`, `archive_path`, or `source_file` (a previous `output_file`). \
+        Filtering by `subsystem` auto-includes debug+info.
+
+        **Iterative drill-down:** pass a previous call's `output_file` back as `source_file` \
+        to re-filter/re-summarize the NDJSON spill without re-scanning the OS log database. \
+        Same filter args apply; mutex with `last`/`start`/`end`/`archive_path`.
 
         Response: `{ count, elapsed_ms, scan_capped, truncated, summary, entries?, head?, tail?, output_file?, hint? }`.
           - ≤50 entries → inline as `entries`.
@@ -328,15 +336,30 @@ enum SlogTools {
         or pre-enable persistence via `sudo log config --subsystem <name> --mode persist:debug`.
         """
     ) { (args: ShowArgs) in
-        // Validate: need at least one time source
-        guard args.last != nil || args.start != nil || args.archive_path != nil else {
-            return errorJSON("Specify 'last', 'start', or 'archive_path'")
-        }
-
         let full = args.full ?? false
         let summaryOnly = args.summary_only ?? false
         if full, summaryOnly {
             return errorJSON("'full' and 'summary_only' are mutually exclusive")
+        }
+
+        // Validate source: exactly one of (source_file) or (last|start|archive_path)
+        if let sourcePath = args.source_file {
+            if args.last != nil || args.start != nil || args.end != nil || args.archive_path != nil {
+                return errorJSON(
+                    "'source_file' is mutually exclusive with 'last'/'start'/'end'/'archive_path'"
+                )
+            }
+            if let outPath = args.output_file {
+                let src = NDJSONSpill.resolveUserPath(sourcePath).standardizedFileURL
+                let out = NDJSONSpill.resolveUserPath(outPath).standardizedFileURL
+                if src == out {
+                    return errorJSON("'output_file' must differ from 'source_file' to avoid clobbering it mid-read")
+                }
+            }
+        } else {
+            guard args.last != nil || args.start != nil || args.archive_path != nil else {
+                return errorJSON("Specify 'last', 'start', 'archive_path', or 'source_file'")
+            }
         }
 
         let setup: FilterSetup
@@ -353,33 +376,36 @@ enum SlogTools {
         case .failed(let result): return result
         }
 
-        // Determine time range
-        let timeRange: ShowConfiguration.TimeRange? = if let last = args.last {
-            if last.lowercased() == "boot" {
-                .lastBoot
-            } else {
-                .last(last)
-            }
-        } else if let start = args.start {
-            if let end = args.end {
-                .range(start: start, end: end)
-            } else {
-                .start(start)
-            }
+        let stream: AsyncThrowingStream<LogEntry, Error>
+        if let sourcePath = args.source_file {
+            // Replay a previous spill — filters/summary apply, no OS scan.
+            stream = NDJSONSpill.readEntries(from: NDJSONSpill.resolveUserPath(sourcePath))
         } else {
-            nil
+            let timeRange: ShowConfiguration.TimeRange? = if let last = args.last {
+                if last.lowercased() == "boot" {
+                    .lastBoot
+                } else {
+                    .last(last)
+                }
+            } else if let start = args.start {
+                if let end = args.end {
+                    .range(start: start, end: end)
+                } else {
+                    .start(start)
+                }
+            } else {
+                nil
+            }
+
+            let config = ShowConfiguration(
+                timeRange: timeRange,
+                archivePath: args.archive_path,
+                predicate: setup.predicate,
+                includeInfo: setup.includeInfo,
+                includeDebug: setup.includeDebug
+            )
+            stream = LogReader().read(configuration: config)
         }
-
-        let config = ShowConfiguration(
-            timeRange: timeRange,
-            archivePath: args.archive_path,
-            predicate: setup.predicate,
-            includeInfo: setup.includeInfo,
-            includeDebug: setup.includeDebug
-        )
-
-        let reader = LogReader()
-        let stream = reader.read(configuration: config)
 
         // `limit` caps retained entries (for inline/spill/head/tail). The summary
         // accumulator always sees the full population so aggregates aren't biased
@@ -404,6 +430,10 @@ enum SlogTools {
             }
         } catch is CancellationError {
             // Cancelled
+        } catch {
+            // Surface NDJSONSpill read/parse errors (and any other stream errors)
+            // rather than silently returning a zero-count result.
+            return errorJSON(error.localizedDescription)
         }
 
         let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
