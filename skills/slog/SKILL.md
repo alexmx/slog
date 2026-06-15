@@ -94,7 +94,7 @@ All checks passed.
 slog mcp [--setup]    # --setup prints integration instructions
 ```
 
-Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`. `process`/`subsystem`/`category` accept JSON arrays (OR-matched).
+Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`. `process`/`subsystem`/`category` accept JSON arrays (OR-matched, exact case-sensitive match — skip the `slog_list_processes` discovery hop when you have a confident name).
 
 **Response envelope** (shared by `slog_show`/`slog_stream`/`slog_list_processes`):
 - ≤50 items → fully inline (`entries`/`processes`).
@@ -135,7 +135,7 @@ Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_s
 ## Key Behaviors
 
 - **Auto-debug:** filtering by `--subsystem` auto-includes debug+info. Override with `--level`/`--info`/`--debug`.
-- **Levels** (least→most verbose): `debug`, `info`, `default`, `error`, `fault`.
+- **Levels** (least→most verbose): `debug`, `info`, `default`, `error`, `fault`. `--level`/`level` is a **minimum**: `error` matches error+fault, not error alone.
 - **Exit codes:** 0 = capture complete or user interrupt · 1 = timeout or stream error.
 - **Dedup:** `--dedup` collapses consecutive identical messages into "message (xN)".
 - **Relative timestamps:** `--time relative` shows deltas between entries.

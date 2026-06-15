@@ -239,7 +239,7 @@ enum SlogTools {
         @InputProperty("Range end. Omit to query to now.")
         var end: String?
 
-        @InputProperty("Process name(s), array, OR-matched. e.g. [\"Finder\", \"Dock\"].")
+        @InputProperty("Process name(s), array, OR-matched, exact case-sensitive match. e.g. [\"Finder\", \"Dock\"]. Skip `slog_list_processes` if you have a confident name.")
         var process: [String]?
 
         @InputProperty("Process ID.")
@@ -251,7 +251,7 @@ enum SlogTools {
         @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem`.")
         var category: [String]?
 
-        @InputProperty("Min level: debug, info, default, error, fault.")
+        @InputProperty("Min level (this level and above): debug, info, default, error, fault. `error` matches error+fault, not error alone.")
         var level: String?
 
         @InputProperty("Regex filter on message (client-side).")
@@ -280,7 +280,7 @@ enum SlogTools {
     }
 
     struct StreamArgs: MCPToolInput {
-        @InputProperty("Process name(s), array, OR-matched. e.g. [\"Finder\", \"Dock\"].")
+        @InputProperty("Process name(s), array, OR-matched, exact case-sensitive match. e.g. [\"Finder\", \"Dock\"]. Skip `slog_list_processes` if you have a confident name.")
         var process: [String]?
 
         @InputProperty("Process ID.")
@@ -292,7 +292,7 @@ enum SlogTools {
         @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem`.")
         var category: [String]?
 
-        @InputProperty("Min level: debug, info, default, error, fault.")
+        @InputProperty("Min level (this level and above): debug, info, default, error, fault. `error` matches error+fault, not error alone.")
         var level: String?
 
         @InputProperty("Regex filter on message (client-side).")
