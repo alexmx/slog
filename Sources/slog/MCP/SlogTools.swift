@@ -271,8 +271,8 @@ enum SlogTools {
         @InputProperty("Regex exclusion on message, e.g. 'heartbeat|keepalive'.")
         var exclude_grep: String?
 
-        @InputProperty("Entries to capture (required, 1–1000).")
-        var count: Int
+        @InputProperty("Stop early after this many entries (1–1000). Omit to run until `timeout`; the call still caps at 1000 to bound memory.")
+        var count: Int?
 
         @InputProperty("Max wait seconds (default 30). Returns whatever is captured on timeout.")
         var timeout: Int?
@@ -517,8 +517,9 @@ enum SlogTools {
         Stream live macOS/iOS logs with bounded capture. Use for real-time debugging or \
         capturing debug events from custom subsystems (which `slog_show` can't replay).
 
-        `count` is required (1–1000). Returns when count is met or `timeout` (default 30s) \
-        elapses. Filtering by `subsystem` auto-includes debug+info. iOS Simulator via `simulator: true`.
+        `count` is optional (1–1000). Returns when count is met or `timeout` (default 30s) \
+        elapses; omit `count` to run until timeout (still capped at 1000 to bound memory). \
+        Filtering by `subsystem` auto-includes debug+info. iOS Simulator via `simulator: true`.
 
         Response: `{ captured, requested, stopped_by, elapsed_ms, truncated, summary, entries?, head?, tail?, output_file? }`.
           - Envelope mirrors `slog_show`: ≤50 inline as `entries`; >50 → `summary` + `head`/`tail` + NDJSON at `output_file`. `full: true` inlines every entry.
@@ -527,15 +528,22 @@ enum SlogTools {
         When `captured == 0`, inspect `elapsed_ms` and `stopped_by` before retrying with a wider window.
         """
     ) { (args: StreamArgs) in
-        guard args.count > 0 else {
-            return errorJSON("'count' must be a positive integer")
+        // `count` is optional; omitted means "until timeout", still capped at 1000
+        // so a chatty machine can't blow memory between timeout ticks.
+        let count: Int
+        if let explicit = args.count {
+            guard explicit > 0 else {
+                return errorJSON("'count' must be a positive integer")
+            }
+            guard explicit <= 1000 else {
+                return errorJSON(
+                    "'count' must be <= 1000 (got \(explicit)). Use a smaller window or run multiple streams."
+                )
+            }
+            count = explicit
+        } else {
+            count = 1000
         }
-        guard args.count <= 1000 else {
-            return errorJSON(
-                "'count' must be <= 1000 (got \(args.count)). Use a smaller window or run multiple streams."
-            )
-        }
-        let count = args.count
 
         let setup: FilterSetup
         switch buildFilterSetup(

@@ -330,9 +330,10 @@ MCP tools return JSON. For token-optimized CLI output, use `--format toon`.
 `slog_show` additionally supports:
 - **`summary_only: true`** — return only the aggregate summary (`{ count, elapsed_ms, scan_capped, summary, hint? }`), no entries or spill file. Cheap for aggregate queries like "errors per subsystem in the last hour". Mutually exclusive with `full`.
 - **`limit: N`** (default 500) — caps **retained** entries for `entries`/`head`/`tail`/`output_file`; the summary always reflects the full matched population, scanning up to a 100,000-event ceiling. `scan_capped: true` warns when that ceiling is reached.
+- **`source_file: "<path>"`** — re-query a previous `output_file` NDJSON spill instead of scanning the OS log database. Same filter args apply; turns iterative drill-down from a multi-second OS scan into a millisecond file pass. Mutually exclusive with `last`/`start`/`end`/`archive_path` and with `output_file == source_file`.
 - **`hint`** — populated only when `count == 0`, explains the most likely cause (e.g. custom subsystems don't persist debug events by default — use `slog_stream` for live capture).
 
-`slog_stream` additionally surfaces `captured`, `requested`, and `stopped_by` (`count` / `timeout` / `exhausted` / `error`).
+`slog_stream` additionally surfaces `captured`, `requested`, and `stopped_by` (`count` / `timeout` / `exhausted` / `error`). `count` is optional (1–1000) — omit it to capture until `timeout` (default 30s), implicitly capped at 1000.
 
 ### AI Agent Skill
 

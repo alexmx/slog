@@ -1,169 +1,117 @@
 # slog
 
-## What is slog?
-
-slog is a Swift CLI tool and MCP server for intercepting and filtering macOS/iOS logs. It wraps Apple's `log` CLI to provide enhanced filtering, formatting, iOS Simulator support, and time-bounded capture for automation workflows.
+Swift CLI + MCP server wrapping Apple's `log` for filtered, formatted, time-bounded macOS/iOS log capture.
 
 ## Project Structure
 
 ```
 slog/
-├── Package.swift                       # SPM manifest (macOS 26+, Swift 6.2)
+├── Package.swift                       # SPM manifest (macOS 15+, Swift 6.2)
 ├── Sources/slog/
 │   ├── Commands/                       # One file per CLI command (ArgumentParser)
-│   │   ├── RootCommand.swift           # @main entry point with 6 subcommands
-│   │   ├── StreamCommand.swift         # Live log streaming with filters
-│   │   ├── ShowCommand.swift           # Historical log queries
-│   │   ├── ProfileCommand.swift        # Profile management (create/list/show/delete)
-│   │   ├── ListCommand.swift           # List processes/simulators
-│   │   ├── DoctorCommand.swift         # System requirements checker
-│   │   └── MCPCommand.swift            # MCP server for AI tool integration
-│   ├── Core/                           # Log handling and shared services
-│   │   ├── LogEntry.swift              # LogEntry struct, LogLevel enum
-│   │   ├── LogParser.swift             # NDJSON and legacy format parser
-│   │   ├── LogStreamer.swift           # Stream process management, PredicateBuilder
-│   │   ├── LogReader.swift             # Historical log reading via `log show`
-│   │   ├── DurationParser.swift        # Duration string parsing (e.g., "5s", "2m")
-│   │   ├── SystemQuery.swift           # Process/simulator listing, UDID resolution
+│   │   ├── RootCommand.swift           # @main, 6 subcommands
+│   │   ├── StreamCommand.swift         # Live streaming
+│   │   ├── ShowCommand.swift           # Historical queries
+│   │   ├── ProfileCommand.swift        # Profile CRUD
+│   │   ├── ListCommand.swift           # Processes / simulators
+│   │   ├── DoctorCommand.swift         # System checks
+│   │   └── MCPCommand.swift            # MCP server entry
+│   ├── Core/                           # Log handling + shared services
+│   │   ├── LogEntry.swift              # LogEntry, LogLevel
+│   │   ├── LogParser.swift             # NDJSON + legacy parser
+│   │   ├── LogStreamer.swift           # `log stream` driver + PredicateBuilder
+│   │   ├── LogReader.swift             # `log show` driver
+│   │   ├── DurationParser.swift        # "5s", "2m" → Duration
+│   │   ├── SystemQuery.swift           # Processes / simulators / UDID
 │   │   ├── DoctorCheck.swift           # System requirement checks
-│   │   └── Version.swift               # Version constant (overridden by CI)
-│   ├── Config/                         # Configuration and profiles
-│   │   ├── XDGDirectories.swift        # XDG-compliant path resolution
-│   │   ├── Profile.swift               # Profile data model (Codable)
-│   │   └── ProfileManager.swift        # Profile CRUD operations
-│   ├── Filters/                        # Filtering system
-│   │   ├── FilterChain.swift           # Thread-safe filter chain with DSL
-│   │   ├── FilterSetup.swift           # Predicate + filter chain + auto-debug builder
-│   │   └── Predicates.swift            # 10+ composable predicate types
+│   │   └── Version.swift               # Version constant (CI-overridden)
+│   ├── Config/
+│   │   ├── XDGDirectories.swift        # XDG path resolution
+│   │   ├── Profile.swift               # Profile model
+│   │   └── ProfileManager.swift        # Profile CRUD
+│   ├── Filters/
+│   │   ├── FilterChain.swift           # Thread-safe filter chain
+│   │   ├── FilterSetup.swift           # Predicate + chain + auto-debug builder
+│   │   └── Predicates.swift            # Composable predicate types
 │   ├── MCP/
-│   │   ├── SlogTools.swift             # 5 MCP tool definitions reusing core logic
+│   │   ├── SlogTools.swift             # 5 MCP tool definitions
 │   │   └── SlogResultEnvelope.swift    # ResultSummary, NDJSONSpill, envelope builders
 │   └── Output/                         # Formatters
-│       ├── Formatter.swift             # Protocol, registry, OutputFormat enum
-│       ├── FormattedEntry.swift        # Shared Encodable model for JSON/TOON
-│       ├── PlainFormatter.swift        # Plain text output
-│       ├── ColorFormatter.swift        # ANSI-colored output
-│       ├── JSONFormatter.swift         # JSON output
-│       ├── ToonFormatter.swift         # TOON output (token-optimized)
-│       └── DedupWriter.swift           # Consecutive message deduplication
-├── Sources/TestEmitter/
-│   └── main.swift                      # Test log emitter for end-to-end testing
-└── Tests/slogTests/                    # Apple Testing framework tests
+│       ├── Formatter.swift             # Protocol, registry, OutputFormat
+│       ├── FormattedEntry.swift        # Shared Encodable model (JSON/TOON)
+│       ├── PlainFormatter.swift
+│       ├── ColorFormatter.swift
+│       ├── JSONFormatter.swift
+│       ├── ToonFormatter.swift         # Token-optimized
+│       └── DedupWriter.swift           # Collapses consecutive identical messages
+├── Sources/TestEmitter/main.swift      # Test log emitter for e2e
+└── Tests/slogTests/                    # Apple Testing framework
 ```
 
-## Build & Run
+## Build, Test, Run
 
 ```bash
-swift build                     # Debug build
-swift build -c release          # Release build
-swift run slog [args]           # Run the tool
-swift test                      # Run all tests
-```
-
-**AI agents:** Always use the **haiku model with a Bash subagent** when running `swift build`, `swift test`, `git commit`, or `git push` to minimize cost and latency.
-
-**Requirements:** macOS 15+, Swift 6.2, Xcode toolchain.
-
-**Dependencies:**
-- `swift-argument-parser` — CLI argument parsing
-- `swift-subprocess` — Modern async process execution
-- `Rainbow` — ANSI color support for terminal output
-- `ToonFormat` — TOON (Token-Oriented Object Notation) encoding
-- `SwiftMCP` (`swift-cli-mcp`) — MCP server framework
-
-## Version Management & Releases
-
-**Version Source:** `.slog-version` file in repository root
-
-- Single source of truth for version number (e.g., `0.1.0` or `dev`)
-- `Sources/slog/Version.swift` defines `slogVersion` constant (defaults to "dev" for local builds)
-- GitHub Actions reads `.slog-version`, generates `Version.swift` with actual version, then builds release binary
-- CLI exposes version via `slog --version`
-
-**Release Process:**
-
-1. Update `.slog-version` with new version (e.g., `0.1.0`)
-2. Commit and push to main
-3. Manually trigger "Release" workflow from GitHub Actions
-4. Workflow creates git tag, builds universal binary, publishes GitHub release
-5. Automatically updates Homebrew formula in `homebrew-tools` repository with new SHA256
-
-**Homebrew Distribution:**
-
-Users install via:
-```bash
-brew tap alexmx/tools
-brew install slog
-```
-
-Formula location: `alexmx/homebrew-tools/Formula/slog.rb`
-
-## Commands
-
-Six subcommands. `stream` is the default (can be omitted).
-
-### Streaming & Querying
-- **stream** — Stream live logs. Filters: `--process`, `--subsystem`, `--category` (each comma-separated for multiple values, OR-matched), `--level`, `--grep`, `--exclude-grep`. Output: `--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`. Bounded capture: `--timeout`, `--capture`, `--count`.
-- **show** — Query historical logs. Requires `--last`, `--start`, or archive path. Same filters and output options as stream, plus `--limit <n>` to cap displayed entries (`show` uses `--limit`, not `--count`).
-
-### Configuration
-- **profile** — CRUD for saved filter/format profiles. `create`, `list`, `show`, `delete`. Use `--profile <name>` on stream/show.
-
-### Discovery
-- **list** — `list processes [--filter]`, `list simulators [--booted] [--all]`.
-
-### System
-- **doctor** — Check system requirements (log CLI, stream/archive access, simctl, profiles dir).
-- **mcp** — Start MCP server. `--setup` for integration instructions.
-
-## MCP Response Envelope
-
-Large-result MCP tools (`slog_show`, `slog_stream`, `slog_list_processes`) share a single truncation contract implemented in `MCP/SlogResultEnvelope.swift`:
-
-- ≤50 items → returned fully inline.
-- &gt;50 items → response carries `summary` (where applicable) plus `head` and `tail` samples (10 each), with the full payload written as NDJSON to `output_file`. Default spill path is `$XDG_CACHE_HOME/slog/runs/<prefix>-<UTC stamp>.ndjson`; callers can override with an explicit `output_file` arg.
-- `full: true` inlines every item, bypassing truncation.
-- `slog_show` additionally supports `summary_only: true` (return just the aggregate, no entries/file) and exposes `scan_capped: true` when the 100,000-event scan ceiling is hit. Its `limit` arg caps **retained** entries only — the summary always reflects the full matched population.
-
-`ResultEnvelopeBuilder` is `LogEntry`-specific (it computes a `ResultSummary`); `ListEnvelopeBuilder<T: Encodable>` handles list-style tools that don't need a summary.
-
-## Testing
-
-Uses Apple's Testing framework (`@Suite`, `@Test`, `#expect()`, `#require()`).
-
-```bash
-swift test                    # Run all tests
-swift test --filter <name>    # Run specific test
-```
-
-**Test emitter** — separate executable for end-to-end testing:
-```bash
-swift run slog-test-emitter              # Emit all test logs once
-swift run slog-test-emitter --repeat 5   # Repeat 5 times
-swift run slog-test-emitter --continuous  # Emit every second until Ctrl+C
-```
-
-## Adding a New Command
-
-1. Create `Sources/slog/Commands/NewCommand.swift` implementing `AsyncParsableCommand`
-2. Register it as a subcommand in `RootCommand.swift`
-3. Put shared business logic in `Core/` (e.g., a new service struct/enum)
-4. Add the corresponding MCP tool in `MCP/SlogTools.swift`
-5. Add tests in `Tests/slogTests/`
-
-## Swift Style
-
-- Swift 6.2 with modern concurrency (async/await, Sendable types)
-- Protocol-based extensibility (LogFormatter, LogPredicate)
-- Builder pattern for predicates and filter chains
-- Shared services called by both CLI commands and MCP tools (thin wrappers)
-
-## Formatting
-
-```bash
+swift build [-c release]
+swift test [--filter <name>]
+swift run slog [args]
 swiftformat .
 ```
 
-## Git Commits
+**Requirements:** macOS 15+, Swift 6.2, Xcode toolchain.
 
-**Never add `Co-Authored-By` attribution to commits.** Write commit messages without any co-author trailers.
+**AI agents:** use the **haiku model with a Bash subagent** for `swift build`, `swift test`, `git commit`, `git push` (cost + latency).
+
+**Dependencies:** `swift-argument-parser`, `swift-subprocess`, `Rainbow` (ANSI), `ToonFormat`, `SwiftMCP` (`swift-cli-mcp`).
+
+**Test emitter** (separate executable for e2e):
+```bash
+swift run slog-test-emitter [--repeat N | --continuous]
+```
+
+## Commands
+
+Six subcommands; `stream` is the default. See `slog --help` or `skills/slog/SKILL.md` for flags.
+
+- **stream** — Live logs, bounded by `--timeout` / `--capture` / `--count`.
+- **show** — Historical logs from `--last` / `--start`/`--end` / archive path. Caps display with `--limit` (not `--count`).
+- **profile** — `create` / `list` / `show` / `delete` saved filter combos. Apply via `--profile <name>` on stream/show.
+- **list** — `list processes [--filter]`, `list simulators [--booted] [--all]`.
+- **doctor** — Verify log CLI / stream / archive access, simctl, profiles dir.
+- **mcp** — Start MCP server. `--setup` prints integration instructions.
+
+## MCP Response Envelope
+
+Shared by `slog_show`, `slog_stream`, `slog_list_processes` (in `MCP/SlogResultEnvelope.swift`):
+
+- ≤50 items → inline. >50 items → `summary` (where applicable) + `head`/`tail` (10 each) + NDJSON spill at `output_file` (default `$XDG_CACHE_HOME/slog/runs/`).
+- `full: true` → inline everything.
+- `slog_show` extras: `summary_only: true` (just the aggregate); `source_file: "<path>"` (re-query a previous spill, skip the OS scan); `scan_capped: true` when the 100k-event ceiling is hit. `limit` caps **retained** entries; summary always covers the full matched population.
+- `slog_stream.count` is optional (1–1000); omit to capture until `timeout`, capped at 1000.
+
+`ResultEnvelopeBuilder` is `LogEntry`-specific (computes `ResultSummary`); `ListEnvelopeBuilder<T: Encodable>` handles list-style tools without a summary.
+
+## Adding a New Command
+
+1. `Sources/slog/Commands/NewCommand.swift` implementing `AsyncParsableCommand`.
+2. Register as a subcommand in `RootCommand.swift`.
+3. Shared logic in `Core/` (service struct/enum).
+4. Add the MCP tool in `MCP/SlogTools.swift`.
+5. Tests in `Tests/slogTests/` (Apple Testing: `@Suite`, `@Test`, `#expect`, `#require`).
+
+## Conventions
+
+- Swift 6.2; async/await, Sendable types.
+- Protocol-based extensibility (`LogFormatter`, `LogPredicate`).
+- Builder pattern for predicates and filter chains.
+- CLI commands and MCP tools share the same Core services (thin wrappers).
+
+## Versioning & Release
+
+- `.slog-version` at repo root is the source of truth. `Sources/slog/Version.swift` defaults to `"dev"`; CI generates the real value before building.
+- Release: bump `.slog-version` → push → trigger "Release" workflow in GitHub Actions → workflow tags, builds universal binary, publishes release, updates `alexmx/homebrew-tools/Formula/slog.rb` SHA256.
+- Homebrew install: `brew install alexmx/tools/slog`.
+
+## Git
+
+- **Never** add `Co-Authored-By` trailers.
+- Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, etc.) with scope where it helps.

@@ -106,9 +106,10 @@ Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_s
 **`slog_show` extras:**
 - `summary_only: true` → just `{ count, elapsed_ms, scan_capped, summary, hint? }`. Best for aggregate questions. Mutex with `full`.
 - `limit: N` (default 500) caps **retained** entries; summary always covers the full population, scanning up to 100k events. `scan_capped: true` → narrow the window.
+- `source_file: "<path>"` re-queries a previous `output_file` instead of the OS log database — same filters, same envelope, milliseconds instead of seconds. Use for iterative drill-down. Mutex with `last`/`start`/`end`/`archive_path` and with `output_file == source_file`.
 - `hint` appears only when `count == 0`.
 
-**`slog_stream` extras:** `captured`, `requested`, `stopped_by` (`count` | `timeout` | `exhausted` | `error`).
+**`slog_stream` extras:** `captured`, `requested`, `stopped_by` (`count` | `timeout` | `exhausted` | `error`). `count` is optional (1–1000) — omit it to capture until `timeout`, implicitly capped at 1000.
 
 ## Filtering Strategies
 
