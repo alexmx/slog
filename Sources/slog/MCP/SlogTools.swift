@@ -152,14 +152,33 @@ enum SlogTools {
         return .text(String(decoding: data, as: UTF8.self))
     }
 
-    /// `{ "error": "<message>" }` payload for tool failures. Uses the same
-    /// encoder as `json` so escaping (quotes, backslashes, newlines, unicode)
-    /// stays consistent with success responses.
-    private static func errorJSON(_ message: String) -> MCPToolResult {
-        guard let data = try? encoder.encode(["error": message]) else {
+    /// `{ "error": "<message>", "try_doctor"?: true }` payload for tool failures.
+    /// Set `tryDoctor: true` on system-level errors (missing `log` CLI, permission
+    /// denied, simctl unavailable) so the agent knows to call `slog_doctor` once
+    /// before retrying. Leave it off for validation/user errors that doctor
+    /// wouldn't shed light on.
+    private static func errorJSON(_ message: String, tryDoctor: Bool = false) -> MCPToolResult {
+        var payload: [String: AnyEncodable] = ["error": AnyEncodable(message)]
+        if tryDoctor {
+            payload["try_doctor"] = AnyEncodable(true)
+        }
+        guard let data = try? encoder.encode(payload) else {
             return .text("{\"error\":\"Failed to encode error\"}")
         }
         return .text(String(decoding: data, as: UTF8.self))
+    }
+
+    /// Type-erased Encodable for building heterogeneous error payloads without
+    /// pulling in a third-party JSON library.
+    private struct AnyEncodable: Encodable {
+        private let encoder: (Encoder) throws -> Void
+        init(_ value: some Encodable) {
+            encoder = { try value.encode(to: $0) }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            try self.encoder(encoder)
+        }
     }
 
     /// Outcome of `buildFilterSetup`: the parsed setup or a ready-to-return
@@ -340,6 +359,9 @@ enum SlogTools {
         `hint` appears only when `count == 0`. Custom (non-Apple) subsystems don't persist debug \
         events by default; if `slog_show` returns 0 from one, use `slog_stream` for live capture \
         or pre-enable persistence via `sudo log config --subsystem <name> --mode persist:debug`.
+
+        On system-level failure (log CLI missing, permission denied, etc.) the error payload \
+        includes `try_doctor: true` — call `slog_doctor` once and surface its findings before retrying.
         """
     ) { (args: ShowArgs) in
         let full = args.full ?? false
@@ -436,10 +458,13 @@ enum SlogTools {
             }
         } catch is CancellationError {
             // Cancelled
+        } catch let spillError as NDJSONSpill.SpillError {
+            // File-level — caller's path or contents are wrong, not a system issue.
+            return errorJSON(spillError.localizedDescription)
         } catch {
-            // Surface NDJSONSpill read/parse errors (and any other stream errors)
-            // rather than silently returning a zero-count result.
-            return errorJSON(error.localizedDescription)
+            // Anything else from the live LogReader stream is a system-level
+            // failure (log CLI missing, no stream permission, etc.).
+            return errorJSON(error.localizedDescription, tryDoctor: true)
         }
 
         let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
@@ -538,6 +563,9 @@ enum SlogTools {
           - `stopped_by`: `count` (success) | `timeout` | `exhausted` (rare) | `error`.
 
         When `captured == 0`, inspect `elapsed_ms` and `stopped_by` before retrying with a wider window.
+
+        On system-level failure (simctl missing, no booted simulator, etc.) the error payload \
+        includes `try_doctor: true` — call `slog_doctor` once and surface its findings before retrying.
         """
     ) { (args: StreamArgs) in
         // `count` is optional; omitted means "until timeout", still capped at 1000
@@ -573,8 +601,14 @@ enum SlogTools {
 
         let target: StreamConfiguration.Target
         if args.simulator == true {
-            let udid = try SystemQuery.resolveSimulatorUDID(args.simulator_udid)
-            target = .simulator(udid: udid)
+            do {
+                let udid = try SystemQuery.resolveSimulatorUDID(args.simulator_udid)
+                target = .simulator(udid: udid)
+            } catch {
+                // simctl missing, no booted simulator, etc. — flag doctor so the
+                // agent surfaces system state before retrying.
+                return errorJSON(error.localizedDescription, tryDoctor: true)
+            }
         } else {
             target = .local
         }

@@ -112,6 +112,8 @@ Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_s
 
 **`slog_stream` extras:** `captured`, `requested`, `stopped_by` (`count` | `timeout` | `exhausted` | `error`). `count` is optional (1–1000) — omit it to capture until `timeout`, implicitly capped at 1000.
 
+**Errors.** Failure payloads are `{ "error": "<message>" }`. When the failure is system-level (log CLI missing, permission denied, simctl unavailable, no booted simulator), the payload also carries `"try_doctor": true` — call `slog_doctor` once and surface its output before retrying. Validation/user errors (bad args, mutex violations, missing `source_file`) don't carry the flag — doctor won't help.
+
 ## Filtering Strategies
 
 1. **Start broad, narrow down.** Process → add subsystem/level/grep.
