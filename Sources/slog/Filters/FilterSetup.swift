@@ -48,7 +48,26 @@ public struct FilterSetup: Sendable {
             level: level
         )
 
+        // Field filters go into the FilterChain too — redundant on the live
+        // path (server-side predicate already filtered) but the only enforcement
+        // on the `source_file` replay path. Cost is microseconds per entry.
         var filterChain = FilterChain()
+        if !processes.isEmpty {
+            filterChain.add(AnyOfPredicate(processes.map { ProcessNamePredicate(processName: $0) }))
+        }
+        if let pid {
+            filterChain.pid(pid)
+        }
+        if !subsystems.isEmpty {
+            // BEGINSWITH mirrors the server-side predicate so child subsystems match.
+            filterChain.add(AnyOfPredicate(subsystems.map { SubsystemPredicate(subsystem: $0, matchPrefix: true) }))
+        }
+        if !categories.isEmpty {
+            filterChain.add(AnyOfPredicate(categories.map { CategoryPredicate(category: $0) }))
+        }
+        if let level {
+            filterChain.minimumLevel(level)
+        }
         if let grep {
             do { try filterChain.messageRegex(grep) }
             catch { throw FilterSetupError.invalidRegex(field: "grep", reason: error.localizedDescription) }

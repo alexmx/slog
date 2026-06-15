@@ -132,3 +132,19 @@ public struct NotPredicate: LogPredicate {
         !predicate.matches(entry)
     }
 }
+
+/// Matches if any of the wrapped predicates matches (OR). Lets us OR-group
+/// multi-value filters like `process: ["Finder", "Dock"]` client-side — useful
+/// when filtering a source_file replay where the server-side predicate isn't
+/// in play.
+public struct AnyOfPredicate: LogPredicate {
+    public let predicates: [any LogPredicate]
+
+    public init(_ predicates: [any LogPredicate]) {
+        self.predicates = predicates
+    }
+
+    public func matches(_ entry: LogEntry) -> Bool {
+        predicates.isEmpty || predicates.contains { $0.matches(entry) }
+    }
+}

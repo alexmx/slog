@@ -179,11 +179,55 @@ struct FilterSetupTests {
 
     // MARK: - Filter Chain
 
-    @Test
-    func emptyFilterChain() throws {
-        let setup = try FilterSetup.build(processes: ["Finder"])
-
+    @Test("Filter chain stays empty only when no filter args are given")
+    func emptyFilterChainWithNoArgs() throws {
+        let setup = try FilterSetup.build()
         #expect(setup.filterChain.isEmpty == true)
+    }
+
+    @Test("Field filters populate the chain too — needed so source_file replay enforces them")
+    func fieldFiltersPopulateChain() throws {
+        let processOnly = try FilterSetup.build(processes: ["Finder"])
+        #expect(processOnly.filterChain.isEmpty == false)
+
+        let multi = try FilterSetup.build(
+            processes: ["Finder", "Dock"],
+            pid: 42,
+            subsystems: ["com.apple.network"],
+            categories: ["http"],
+            level: .error
+        )
+        // One predicate per non-empty field (processes/subsystems/categories
+        // each become a single AnyOfPredicate regardless of value count).
+        #expect(multi.filterChain.count == 5)
+    }
+
+    @Test("Field filters in the chain match entries — drives source_file drill-down correctness")
+    func fieldFiltersMatchEntries() throws {
+        let setup = try FilterSetup.build(
+            processes: ["Finder", "Dock"],
+            level: .error
+        )
+
+        let matching = LogEntry(
+            timestamp: Date(), processName: "Finder", pid: 1,
+            subsystem: nil, category: nil, level: .error,
+            message: "boom"
+        )
+        let wrongProcess = LogEntry(
+            timestamp: Date(), processName: "Other", pid: 1,
+            subsystem: nil, category: nil, level: .error,
+            message: "boom"
+        )
+        let wrongLevel = LogEntry(
+            timestamp: Date(), processName: "Finder", pid: 1,
+            subsystem: nil, category: nil, level: .default,
+            message: "ok"
+        )
+
+        #expect(setup.filterChain.matches(matching) == true)
+        #expect(setup.filterChain.matches(wrongProcess) == false)
+        #expect(setup.filterChain.matches(wrongLevel) == false)
     }
 
     @Test
