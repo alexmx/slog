@@ -58,7 +58,7 @@ slog stream --process MyApp --count 10
 | Command | Description | Key Options | Example |
 |---------|-------------|-------------|---------|
 | `stream` | Stream live logs (default command) | `--process` `--subsystem` `--level` `--grep` `--format` `--count` | `slog stream --process MyApp --level error` |
-| `show` | Query historical logs | `--last` `--start`/`--end` `--process` `--format` `--count` | `slog show --last 5m --format json` |
+| `show` | Query historical logs | `--last` `--start`/`--end` `--process` `--format` `--limit` | `slog show --last 5m --format json` |
 
 ### Configuration
 

@@ -231,6 +231,64 @@ struct NDJSONSpillTests {
     }
 }
 
+@Suite("SummaryAccumulator Tests")
+struct SummaryAccumulatorTests {
+    private func entry(
+        _ index: Int,
+        process: String,
+        subsystem: String?,
+        level: LogLevel
+    ) -> LogEntry {
+        LogEntry(
+            timestamp: Date(timeIntervalSince1970: TimeInterval(1_700_000_000 + index)),
+            processName: process,
+            pid: index,
+            subsystem: subsystem,
+            category: nil,
+            level: level,
+            message: "msg"
+        )
+    }
+
+    @Test("Streaming accumulator matches batch ResultSummary on the same input")
+    func equivalenceWithBatchInit() {
+        let entries = [
+            entry(0, process: "A", subsystem: "sub.x", level: .error),
+            entry(1, process: "A", subsystem: "sub.x", level: .error),
+            entry(2, process: "B", subsystem: "sub.y", level: .default),
+            entry(3, process: "A", subsystem: nil, level: .info)
+        ]
+        var accumulator = SummaryAccumulator()
+        for e in entries { accumulator.add(e) }
+        let streamed = accumulator.build()
+        let batch = ResultSummary(entries: entries)
+
+        #expect(streamed.byLevel == batch.byLevel)
+        #expect(streamed.timeRange?.start == batch.timeRange?.start)
+        #expect(streamed.timeRange?.end == batch.timeRange?.end)
+        #expect(streamed.topProcesses.map(\.name) == batch.topProcesses.map(\.name))
+        #expect(streamed.topProcesses.map(\.count) == batch.topProcesses.map(\.count))
+        #expect(streamed.topSubsystems.map(\.name) == batch.topSubsystems.map(\.name))
+    }
+
+    @Test("count tracks total entries added")
+    func countTracksAdditions() {
+        var accumulator = SummaryAccumulator()
+        for i in 0..<37 {
+            accumulator.add(entry(i, process: "P", subsystem: nil, level: .default))
+        }
+        #expect(accumulator.count == 37)
+    }
+
+    @Test("Empty accumulator builds a summary with nil time range")
+    func emptyAccumulator() {
+        let summary = SummaryAccumulator().build()
+        #expect(summary.timeRange == nil)
+        #expect(summary.byLevel.isEmpty)
+        #expect(summary.topProcesses.isEmpty)
+    }
+}
+
 @Suite("ResultSummary Tests")
 struct ResultSummaryTests {
     private func entry(

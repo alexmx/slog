@@ -66,7 +66,7 @@ struct Slog: AsyncParsableCommand {
           --format <fmt>          Output format: plain, compact, color (default), json, toon
           --info                  Include info-level messages
           --debug                 Include debug-level messages
-          --count <n>             Maximum number of entries to display
+          --limit <n>             Maximum number of entries to display
         
         Archive:
           [archive-path]          Optional path to a .logarchive file

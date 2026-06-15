@@ -33,38 +33,80 @@ struct ResultSummary: Encodable {
     }
 
     init(entries: [LogEntry], topN: Int = 10) {
-        if let first = entries.first, let last = entries.last {
-            timeRange = TimeRange(start: first.timestamp, end: last.timestamp)
-        } else {
-            timeRange = nil
-        }
-        var levels: [String: Int] = [:]
-        var processes: [String: Int] = [:]
-        var subsystems: [String: Int] = [:]
-        var categories: [String: Int] = [:]
+        var accumulator = SummaryAccumulator()
         for entry in entries {
-            levels[entry.level.rawValue, default: 0] += 1
-            processes[entry.processName, default: 0] += 1
-            if let sub = entry.subsystem, !sub.isEmpty {
-                subsystems[sub, default: 0] += 1
-            }
-            if let cat = entry.category, !cat.isEmpty {
-                categories[cat, default: 0] += 1
-            }
+            accumulator.add(entry)
         }
-        byLevel = levels
-        topProcesses = Self.topBuckets(processes, limit: topN)
-        topSubsystems = Self.topBuckets(subsystems, limit: topN)
-        topCategories = Self.topBuckets(categories, limit: topN)
+        self = accumulator.build(topN: topN)
     }
 
-    private static func topBuckets(_ counts: [String: Int], limit: Int) -> [Bucket] {
+    fileprivate init(
+        timeRange: TimeRange?,
+        byLevel: [String: Int],
+        topProcesses: [Bucket],
+        topSubsystems: [Bucket],
+        topCategories: [Bucket]
+    ) {
+        self.timeRange = timeRange
+        self.byLevel = byLevel
+        self.topProcesses = topProcesses
+        self.topSubsystems = topSubsystems
+        self.topCategories = topCategories
+    }
+
+    fileprivate static func topBuckets(_ counts: [String: Int], limit: Int) -> [Bucket] {
         counts
             .sorted { lhs, rhs in
                 lhs.value != rhs.value ? lhs.value > rhs.value : lhs.key < rhs.key
             }
             .prefix(limit)
             .map { Bucket(name: $0.key, count: $0.value) }
+    }
+}
+
+/// Streaming counterpart to `ResultSummary` — accumulates one entry at a time
+/// so we can compute the full-population summary without retaining every
+/// `LogEntry` in memory. Used by `slog_show` to scan past the `count` cap for
+/// aggregate accuracy.
+struct SummaryAccumulator {
+    private var firstTimestamp: Date?
+    private var lastTimestamp: Date?
+    private var levels: [String: Int] = [:]
+    private var processes: [String: Int] = [:]
+    private var subsystems: [String: Int] = [:]
+    private var categories: [String: Int] = [:]
+    private(set) var count: Int = 0
+
+    mutating func add(_ entry: LogEntry) {
+        count += 1
+        if firstTimestamp == nil {
+            firstTimestamp = entry.timestamp
+        }
+        lastTimestamp = entry.timestamp
+        levels[entry.level.rawValue, default: 0] += 1
+        processes[entry.processName, default: 0] += 1
+        if let sub = entry.subsystem, !sub.isEmpty {
+            subsystems[sub, default: 0] += 1
+        }
+        if let cat = entry.category, !cat.isEmpty {
+            categories[cat, default: 0] += 1
+        }
+    }
+
+    func build(topN: Int = 10) -> ResultSummary {
+        let range: ResultSummary.TimeRange?
+        if let first = firstTimestamp, let last = lastTimestamp {
+            range = ResultSummary.TimeRange(start: first, end: last)
+        } else {
+            range = nil
+        }
+        return ResultSummary(
+            timeRange: range,
+            byLevel: levels,
+            topProcesses: ResultSummary.topBuckets(processes, limit: topN),
+            topSubsystems: ResultSummary.topBuckets(subsystems, limit: topN),
+            topCategories: ResultSummary.topBuckets(categories, limit: topN)
+        )
     }
 }
 

@@ -58,6 +58,7 @@ class SendableEntryContainer: @unchecked Sendable {
 struct ShowResult: Encodable {
     let count: Int
     let elapsedMs: Int
+    let scanCapped: Bool
     let truncated: Bool
     let summary: ResultSummary?
     let entries: [LogEntry]?
@@ -76,6 +77,7 @@ struct ShowResult: Encodable {
         case hint
         case elapsedMs = "elapsed_ms"
         case outputFile = "output_file"
+        case scanCapped = "scan_capped"
     }
 }
 
@@ -236,8 +238,10 @@ enum SlogTools {
         @InputProperty("Exclude messages matching regex (e.g. 'heartbeat|keepalive' to remove noise)")
         var exclude_grep: String?
 
-        @InputProperty("Maximum number of entries to return (default: 500)")
-        var count: Int?
+        @InputProperty(
+            "Maximum number of entries to retain for `entries`/`head`/`tail`/`output_file` (default: 500). The summary is still computed over the full population — up to a 100,000-event scan ceiling."
+        )
+        var limit: Int?
 
         @InputProperty("Path to a .logarchive file (alternative to last/start)")
         var archive_path: String?
@@ -248,9 +252,14 @@ enum SlogTools {
         var output_file: String?
 
         @InputProperty(
-            "Return every entry inline instead of the default summary+head+tail envelope. Off by default — only set this when you genuinely need the full payload in the response."
+            "Return every entry inline instead of the default summary+head+tail envelope. Off by default — only set this when you genuinely need the full payload in the response. Mutually exclusive with `summary_only`."
         )
         var full: Bool?
+
+        @InputProperty(
+            "Return only the aggregate summary (no entries, no spill file). Use for questions like 'errors per subsystem in the last hour' where individual events aren't needed. Mutually exclusive with `full`."
+        )
+        var summary_only: Bool?
     }
 
     struct StreamArgs: MCPToolInput {
@@ -342,7 +351,7 @@ enum SlogTools {
         subsystem/level/grep. Filtering by `subsystem` auto-includes debug+info; \
         otherwise only default+ levels are returned.
 
-        **Response shape (default):** `{ count, elapsed_ms, truncated, summary, entries?, head?, tail?, output_file?, hint? }`. \
+        **Response shape (default):** `{ count, elapsed_ms, scan_capped, truncated, summary, entries?, head?, tail?, output_file?, hint? }`. \
         Small result sets (≤50 entries) come back fully inline as `entries`. Larger sets \
         are truncated by default: `summary` (time range, by-level counts, top processes/\
         subsystems/categories), plus `head` and `tail` samples (10 each), and the complete \
@@ -350,6 +359,15 @@ enum SlogTools {
         offset/limit` or `jq` — do NOT slurp the whole file unless you actually need it. \
         Set `full: true` to bypass truncation and inline every entry. Supply `output_file` \
         to control where the NDJSON lands; otherwise it goes under `$XDG_CACHE_HOME/slog/runs/`.
+
+        **Aggregate-only mode:** set `summary_only: true` to get just `{ count, elapsed_ms, scan_capped, summary, hint? }`. \
+        No entries, no spill file. Use this for questions like "errors per subsystem in the last hour" — \
+        much cheaper than retrieving entries you don't need.
+
+        **Summary accuracy:** `summary` always reflects the full matched population, not just \
+        the retained `entries`. The handler streams up to 100,000 matching events per call; if \
+        the ceiling is reached, `scan_capped: true` warns the caller to narrow the window. \
+        `limit` only caps how many entries are retained for inline/spill, never the summary scan.
 
         The optional `hint` appears only when `count == 0` and explains the most likely cause.
 
@@ -363,6 +381,12 @@ enum SlogTools {
         // Validate: need at least one time source
         guard args.last != nil || args.start != nil || args.archive_path != nil else {
             return errorJSON("Specify 'last', 'start', or 'archive_path'")
+        }
+
+        let full = args.full ?? false
+        let summaryOnly = args.summary_only ?? false
+        if full, summaryOnly {
+            return errorJSON("'full' and 'summary_only' are mutually exclusive")
         }
 
         let setup: FilterSetup
@@ -407,26 +431,56 @@ enum SlogTools {
         let reader = LogReader()
         let stream = reader.read(configuration: config)
 
+        // `limit` caps retained entries (for inline/spill/head/tail). The summary
+        // accumulator always sees the full population so aggregates aren't biased
+        // toward the start of the window — capped only at the hard scan ceiling.
+        let retainCap = args.limit ?? 500
         var entries: [LogEntry] = []
-        let maxCount = args.count ?? 500
+        var accumulator = SummaryAccumulator()
+        var scanCapped = false
         let started = Date()
 
         do {
             for try await entry in stream {
                 guard setup.filterChain.isEmpty || setup.filterChain.matches(entry) else { continue }
-                entries.append(entry)
-                if entries.count >= maxCount { break }
+                accumulator.add(entry)
+                if !summaryOnly, entries.count < retainCap {
+                    entries.append(entry)
+                }
+                if accumulator.count >= scanCeiling {
+                    scanCapped = true
+                    break
+                }
             }
         } catch is CancellationError {
             // Cancelled
         }
 
         let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+        let matched = accumulator.count
+        let summary = matched == 0 ? nil : accumulator.build()
+        let hint = matched == 0 ? emptyShowHint(args: args) : nil
+
+        if summaryOnly {
+            return try json(ShowResult(
+                count: matched,
+                elapsedMs: elapsedMs,
+                scanCapped: scanCapped,
+                truncated: false,
+                summary: summary,
+                entries: nil,
+                head: nil,
+                tail: nil,
+                outputFile: nil,
+                hint: hint
+            ))
+        }
+
         let envelope: ResultEnvelopeBuilder.Output
         do {
             envelope = try ResultEnvelopeBuilder(
                 entries: entries,
-                full: args.full ?? false,
+                full: full,
                 outputFile: args.output_file,
                 spillPrefix: "show"
             ).build()
@@ -434,19 +488,24 @@ enum SlogTools {
             return errorJSON(error.localizedDescription)
         }
 
-        let result = ShowResult(
-            count: entries.count,
+        return try json(ShowResult(
+            count: matched,
             elapsedMs: elapsedMs,
+            scanCapped: scanCapped,
             truncated: envelope.truncated,
-            summary: entries.isEmpty ? nil : envelope.summary,
+            summary: summary,
             entries: envelope.inlineEntries,
             head: envelope.head,
             tail: envelope.tail,
             outputFile: envelope.outputFile?.path,
-            hint: entries.isEmpty ? emptyShowHint(args: args) : nil
-        )
-        return try json(result)
+            hint: hint
+        ))
     }
+
+    /// Hard upper bound on how many matching events `slog_show` will scan in
+    /// one call. Bounds wall-clock and memory on runaway windows; reflected to
+    /// callers via `scan_capped: true` when hit.
+    private static let scanCeiling = 100_000
 
     /// Reasons we can offer when `slog_show` returns 0 entries. Order matters
     /// — the most specific cause wins.

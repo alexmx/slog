@@ -78,7 +78,7 @@ struct ShowCommand: AsyncParsableCommand {
     // MARK: - Limit Options
 
     @Option(name: .long, help: "Maximum number of entries to display")
-    var count: Int?
+    var limit: Int?
 
     // MARK: - Archive Path
 
@@ -102,8 +102,8 @@ struct ShowCommand: AsyncParsableCommand {
             throw ValidationError("--end requires --start or a .logarchive path")
         }
 
-        if let count, count <= 0 {
-            throw ValidationError("--count must be a positive integer")
+        if let limit, limit <= 0 {
+            throw ValidationError("--limit must be a positive integer")
         }
     }
 
@@ -195,7 +195,7 @@ struct ShowCommand: AsyncParsableCommand {
                 }
 
                 entryCount += 1
-                if let maxCount = count, entryCount >= maxCount {
+                if let limit, entryCount >= limit {
                     break
                 }
             }

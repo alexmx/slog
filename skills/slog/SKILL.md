@@ -98,7 +98,7 @@ slog show [options] [archive-path]
 
 **Filters:** same as stream (`--process`, `--pid`, `--subsystem`, `--category`, `--level`, `--grep`, `--exclude-grep`).
 
-**Output:** same as stream (`--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`, `--count`).
+**Output:** same as stream (`--format`, `--time`, `--info`, `--debug`, `--source`, `--dedup`) plus `--limit <n>` to cap displayed entries.
 
 ```bash
 $ slog show --last 5m --process Finder --level error
@@ -242,7 +242,7 @@ All commands support structured output formats via `--format`:
 - Prefer `--format toon` for AI agent workflows to reduce token usage.
 - Use `slog show --last boot` to see all logs since the last system boot.
 - Combine `--grep` and `--exclude-grep` for precise message filtering.
-- Use `--count` with `--format json` to capture structured log data for analysis.
+- Bound the output for analysis: `slog show --limit N --format json` or `slog stream --count N --format json`.
 - Profiles persist filter settings — use `--profile` to avoid retyping complex flag combinations.
 - `--source` adds file/function/line info when available (requires the logging framework to emit it).
 - When piping to `jq`, use `--format json`: `slog stream --process MyApp --format json | jq '.message'`.
