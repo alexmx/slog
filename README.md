@@ -317,28 +317,9 @@ MCP tools return JSON. For token-optimized CLI output, use `--format toon`.
 
 `slog_show` and `slog_stream` accept `process`, `subsystem`, and `category` as JSON arrays (e.g. `"process": ["Finder", "Dock"]`); multiple values are OR-matched.
 
-### Response Envelope
+Responses are designed to keep agent contexts small: large result sets come back as a summary plus head/tail samples, with the full payload written as NDJSON to a spill file the agent can read selectively. `slog_show` also supports aggregate-only queries, replaying a previous spill instead of re-scanning, and tailing via a `next_since` cursor.
 
-`slog_show`, `slog_stream`, and `slog_list_processes` share a token-cheap response contract to avoid dumping multi-KB single-line JSON blobs into the agent's context:
-
-- **≤50 items** — returned fully inline (`entries` / `processes`), no spill.
-- **&gt;50 items** — response includes a `summary` (where applicable), plus `head` and `tail` samples (10 each), with the complete payload written as NDJSON to `output_file`. Default spill path is `$XDG_CACHE_HOME/slog/runs/<prefix>-<UTC stamp>.ndjson`. Use `Read offset/limit` or `jq` on this file to drill in selectively.
-- Pass **`output_file: "<path>"`** to control where the NDJSON lands (tilde-expanded, parent dirs auto-created).
-- Pass **`full: true`** to bypass truncation and inline every item.
-- `truncated: true` in the response flags which path was taken.
-
-`slog_show` additionally supports:
-- **`summary_only: true`** — return only the aggregate summary (`{ count, elapsed_ms, scan_capped, summary, hint? }`), no entries or spill file. Cheap for aggregate queries like "errors per subsystem in the last hour". Mutually exclusive with `full`.
-- **`limit: N`** (default 500) — caps **retained** entries for `entries`/`head`/`tail`/`output_file`; the summary always reflects the full matched population, scanning up to a 100,000-event ceiling. `scan_capped: true` warns when that ceiling is reached.
-- **`source_file: "<path>"`** — re-query a previous `output_file` NDJSON spill instead of scanning the OS log database. Same filter args apply; turns iterative drill-down from a multi-second OS scan into a millisecond file pass. Mutually exclusive with `last`/`start`/`end`/`archive_path` and with `output_file == source_file`.
-- **`next_since`** — populated in every response (`null` when `count == 0`). Latest matched timestamp + 1µs. For tailing workflows, pass it back as the next call's `start` to fetch only what's new without re-pulling the boundary event.
-- **`hint`** — populated only when `count == 0`, explains the most likely cause (e.g. custom subsystems don't persist debug events by default — use `slog_stream` for live capture).
-
-`slog_stream` additionally surfaces `captured`, `requested`, and `stopped_by` (`count` / `timeout` / `exhausted` / `error`). `count` is optional (1–1000) — omit it to capture until `timeout` (default 30s), implicitly capped at 1000.
-
-### AI Agent Skill
-
-A comprehensive skill guide is available in `skills/slog/SKILL.md` that teaches AI agents how to use slog effectively. The skill includes detailed command examples, filtering strategies, and best practices optimized for AI agent usage.
+For the full contract — every arg, every response field, agent workflow patterns — see [`skills/slog/SKILL.md`](skills/slog/SKILL.md) or the tool descriptions surfaced by the MCP server itself.
 
 ## License
 
