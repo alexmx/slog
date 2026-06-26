@@ -11,6 +11,7 @@ A macOS CLI tool and MCP server for streaming, filtering, and querying system lo
 ## Features
 
 - **Stream & query logs** from macOS or iOS Simulator in real-time or from history
+- **Signpost interval timing** via `--signpost` — pair `os_signpost` begin/end events into per-name durations (count/p50/max/total) without Instruments
 - **Powerful filtering** by process, subsystem, category, log level, and regex patterns
 - **Multiple output formats**: plain, compact, colored, JSON, and TOON (token-optimized for LLMs)
 - **Saved profiles** for reusable filter/format combinations
@@ -57,8 +58,17 @@ slog stream --process MyApp --count 10
 
 | Command | Description | Key Options | Example |
 |---------|-------------|-------------|---------|
-| `stream` | Stream live logs (default command) | `--process` `--subsystem` `--level` `--grep` `--format` `--count` | `slog stream --process MyApp --level error` |
-| `show` | Query historical logs | `--last` `--start`/`--end` `--process` `--format` `--limit` | `slog show --last 5m --format json` |
+| `stream` | Stream live logs (default command) | `--process` `--subsystem` `--level` `--grep` `--format` `--count` `--signpost` | `slog stream --process MyApp --level error` |
+| `show` | Query historical logs | `--last` `--start`/`--end` `--process` `--format` `--limit` `--signpost` | `slog show --last 5m --format json` |
+
+**Signpost mode** (`--signpost` on `stream`/`show`): report `os_signpost` interval durations instead of log messages. Pairs begin↔end by (process, signpost name, signpost id) so concurrent same-name intervals stay distinct, and aggregates per name. Live `stream --signpost` needs no persistence; `show --signpost` reads the persisted store. Works with `--format json`/`toon`.
+
+```sh
+$ slog stream --signpost --subsystem com.myapp --category perf --capture 20s
+interval         count  p50     max     total   last args
+parse.postImage  3      42.8ms  45.1ms  128ms   len 208123
+attr.chunk       7      1.1ms   7.0ms   9.8ms   start 0
+```
 
 ### Configuration
 
@@ -244,6 +254,22 @@ slog stream --process MyApp --timeout 5s || echo "App not logging"
 slog stream --process MyApp --count 10 --format json > logs.json
 ```
 
+### Signpost Timing
+
+```bash
+# Live: capture interval durations while exercising the app (no persistence needed)
+slog stream --signpost --subsystem com.myapp --category perf --capture 20s
+
+# Historical: read persisted signposts from the last 5 minutes
+slog show --last 5m --signpost --subsystem com.myapp --category perf
+
+# JSON for analysis (includes per-occurrence start/duration/args)
+slog show --last 5m --signpost --subsystem com.myapp --format json
+
+# If `show --signpost` finds nothing, enable persistence for the subsystem first
+sudo log config --subsystem com.myapp --mode persist:debug
+```
+
 ### Profiles
 
 ```bash
@@ -309,6 +335,7 @@ skillman install github.com/alexmx/slog
 All log commands are exposed as MCP tools with the `slog_` prefix:
 - `slog_show` — Query historical logs with filters and time ranges
 - `slog_stream` — Stream live logs with bounded capture (max 1000 entries, default 30s timeout)
+- `slog_signpost` — Report `os_signpost` interval durations (begin/end pairs) for a subsystem/category; persisted query or live capture (`live: true`)
 - `slog_list_processes` — List running processes with optional name filter
 - `slog_list_simulators` — List iOS Simulators
 - `slog_doctor` — Check system requirements
