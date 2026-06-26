@@ -62,6 +62,26 @@ $ slog show --last 5m --process Finder --level error
 21:46:22.910 [ERROR] Finder[21162] (com.apple.finder:) Connection failed
 ```
 
+### `slog stream --signpost` / `slog show --signpost` — interval durations
+
+Report `os_signpost` interval durations (begin/end pairs from `OSSignposter.beginInterval`/`endInterval`) instead of log messages — timing without opening Instruments.
+
+```bash
+slog stream --signpost --subsystem com.myapp --category perf --capture 10s   # live (no persistence needed)
+slog show --last 5m --signpost --subsystem com.myapp --category perf          # post-hoc (persisted store)
+```
+
+Pairs begin↔end by (process, signpost name, signpost id) — concurrent same-name intervals stay distinct. Aggregates per name; in-flight begins (no end) show null duration. Works with `--format json`/`toon`.
+
+```bash
+$ slog stream --signpost --subsystem com.myapp --category perf --capture 10s
+interval         count  p50     max     total   last args
+parse.postImage  3      42.8ms  45.1ms  128ms   len 208123
+attr.chunk       7      1.1ms   7.0ms   9.8ms   start 0
+```
+
+Live `stream --signpost` needs no persistence — the reliable path right after exercising the app. `show --signpost` reads the persisted store; custom-subsystem signposts may need `sudo log config --subsystem <name> --mode persist:debug` first.
+
 ### `slog profile` — saved filter profiles
 
 Stored in `$XDG_CONFIG_HOME/slog/profiles/` (defaults to `~/.config/slog/profiles/`).
@@ -94,7 +114,7 @@ All checks passed.
 slog mcp [--setup]    # --setup prints integration instructions
 ```
 
-Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`. `process`/`subsystem`/`category` accept JSON arrays (OR-matched, exact case-sensitive match — skip the `slog_list_processes` discovery hop when you have a confident name).
+Exposes 6 tools: `slog_show`, `slog_stream`, `slog_signpost`, `slog_list_processes`, `slog_list_simulators`, `slog_doctor`. `process`/`subsystem`/`category` accept JSON arrays (OR-matched, exact case-sensitive match — skip the `slog_list_processes` discovery hop when you have a confident name).
 
 **Response envelope** (shared by `slog_show`/`slog_stream`/`slog_list_processes`):
 - ≤50 items → fully inline (`entries`/`processes`).
@@ -111,6 +131,8 @@ Exposes 5 tools: `slog_show`, `slog_stream`, `slog_list_processes`, `slog_list_s
 - `hint` appears only when `count == 0`.
 
 **`slog_stream` extras:** `captured`, `requested`, `stopped_by` (`count` | `timeout` | `exhausted` | `error`). `count` is optional (1–1000) — omit it to capture until `timeout`, implicitly capped at 1000. When `stopped_by == "error"` the response includes `error_message` (raw failure text); if `captured == 0` it also carries `try_doctor: true` (zero output usually means the stream never opened — call `slog_doctor`).
+
+**`slog_signpost`** (separate, non-envelope shape): aggregated `os_signpost` intervals. Returns `{ count, in_flight, orphan_ends, elapsed_ms, mode, intervals, hint? }`; `intervals` is grouped by name with `min_ms`/`p50_ms`/`max_ms`/`total_ms` (nil stats omitted when all in-flight). Persisted query via `last`/`start`/`archive_path`; live capture via `live: true` + `timeout` (default 10s, no persistence needed). `full: true` adds per-occurrence `occurrences` (start, duration_ms, message). `hint` appears only when `count == 0`.
 
 **Errors.** Failure payloads are `{ "error": "<message>" }`. When the failure is system-level (log CLI missing, permission denied, simctl unavailable, no booted simulator), the payload also carries `"try_doctor": true` — call `slog_doctor` once and surface its output before retrying. Validation/user errors (bad args, mutex violations, missing `source_file`) don't carry the flag — doctor won't help.
 

@@ -152,6 +152,33 @@ struct PredicateBuilderTests {
     }
 
     @Test
+    func buildPredicateSignpostOnly() throws {
+        let predicate = PredicateBuilder.buildPredicate(
+            subsystems: ["com.my.app"],
+            categories: ["perf"],
+            signpostOnly: true
+        )
+
+        #expect(try #require(predicate?.contains("eventType == \"signpostEvent\"")))
+        #expect(try #require(predicate?.contains("subsystem BEGINSWITH \"com.my.app\"")))
+        #expect(try #require(predicate?.contains("category == \"perf\"")))
+    }
+
+    @Test
+    func signpostModeSkipsLevelConstraint() throws {
+        // Level must be ignored in signpost mode — signpost events carry a
+        // different messageType and would be filtered out by a level clause.
+        let predicate = PredicateBuilder.buildPredicate(
+            subsystems: ["com.my.app"],
+            level: .error,
+            signpostOnly: true
+        )
+
+        #expect(predicate?.contains("messageType") == false)
+        #expect(try #require(predicate?.contains("eventType == \"signpostEvent\"")))
+    }
+
+    @Test
     func buildPredicateSingle() {
         let predicate = PredicateBuilder.buildPredicate(subsystems: ["com.apple.network"])
 

@@ -38,14 +38,16 @@ public struct FilterSetup: Sendable {
         grep: String? = nil,
         excludeGrep: String? = nil,
         info: Bool = false,
-        debug: Bool = false
+        debug: Bool = false,
+        signpost: Bool = false
     ) throws -> FilterSetup {
         let predicate = PredicateBuilder.buildPredicate(
             processes: processes,
             pid: pid,
             subsystems: subsystems,
             categories: categories,
-            level: level
+            level: level,
+            signpostOnly: signpost
         )
 
         // Field filters go into the FilterChain too — redundant on the live
@@ -77,7 +79,8 @@ public struct FilterSetup: Sendable {
             catch { throw FilterSetupError.invalidRegex(field: "exclude_grep", reason: error.localizedDescription) }
         }
 
-        let autoDebug = !subsystems.isEmpty && level == nil && !info && !debug
+        // Signpost mode includes info+debug so debug-scoped signposts surface.
+        let autoDebug = signpost || (!subsystems.isEmpty && level == nil && !info && !debug)
         let includeDebug = debug || autoDebug
         let includeInfo = info || includeDebug
 

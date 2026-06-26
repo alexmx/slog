@@ -39,13 +39,18 @@ public struct ShowConfiguration: Sendable, Equatable {
     /// Whether to include source location info
     public let includeSource: Bool
 
+    /// Whether to surface `os_signpost` events (passes `--signpost`; they are
+    /// skipped by `log show` otherwise)
+    public let includeSignposts: Bool
+
     public init(
         timeRange: TimeRange? = nil,
         archivePath: String? = nil,
         predicate: String? = nil,
         includeInfo: Bool = true,
         includeDebug: Bool = false,
-        includeSource: Bool = false
+        includeSource: Bool = false,
+        includeSignposts: Bool = false
     ) {
         self.timeRange = timeRange
         self.archivePath = archivePath
@@ -53,6 +58,7 @@ public struct ShowConfiguration: Sendable, Equatable {
         self.includeInfo = includeInfo
         self.includeDebug = includeDebug
         self.includeSource = includeSource
+        self.includeSignposts = includeSignposts
     }
 }
 
@@ -117,6 +123,10 @@ public struct LogReader: Sendable {
 
         if configuration.includeSource {
             args.append("--source")
+        }
+
+        if configuration.includeSignposts {
+            args.append("--signpost")
         }
 
         // Time range arguments

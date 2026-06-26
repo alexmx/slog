@@ -146,6 +146,39 @@ struct StreamResult: Encodable {
     }
 }
 
+/// Response shape for `slog_signpost`. Aggregated os_signpost intervals grouped
+/// by name, with per-name duration stats. `mode` distinguishes the persisted
+/// `show` query from a live `stream` capture. `hint` is populated only when
+/// `count == 0`.
+struct SignpostResult: Encodable {
+    /// Total interval occurrences across all names (completed + in-flight).
+    let count: Int
+    let inFlight: Int
+    let orphanEnds: Int
+    let elapsedMs: Int
+    /// `show` (persisted query) | `stream` (live capture).
+    let mode: String
+    let intervals: [FormattedSignpost]
+    let hint: String?
+    /// Live-capture only: `timeout` | `exhausted` | `error`.
+    let stoppedBy: String?
+    let errorMessage: String?
+    let tryDoctor: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case count
+        case mode
+        case intervals
+        case hint
+        case inFlight = "in_flight"
+        case orphanEnds = "orphan_ends"
+        case elapsedMs = "elapsed_ms"
+        case stoppedBy = "stopped_by"
+        case errorMessage = "error_message"
+        case tryDoctor = "try_doctor"
+    }
+}
+
 enum SlogTools {
     // MARK: - Helpers
 
@@ -182,7 +215,7 @@ enum SlogTools {
     private struct AnyEncodable: Encodable {
         private let encoder: (Encoder) throws -> Void
         init(_ value: some Encodable) {
-            encoder = { try value.encode(to: $0) }
+            self.encoder = { try value.encode(to: $0) }
         }
 
         func encode(to encoder: Encoder) throws {
@@ -239,7 +272,9 @@ enum SlogTools {
         @InputProperty("Range end. Omit to query to now.")
         var end: String?
 
-        @InputProperty("Process name(s), array, OR-matched, exact case-sensitive match. e.g. [\"Finder\", \"Dock\"]. Skip `slog_list_processes` if you have a confident name.")
+        @InputProperty(
+            "Process name(s), array, OR-matched, exact case-sensitive match. e.g. [\"Finder\", \"Dock\"]. Skip `slog_list_processes` if you have a confident name."
+        )
         var process: [String]?
 
         @InputProperty("Process ID.")
@@ -251,7 +286,9 @@ enum SlogTools {
         @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem`.")
         var category: [String]?
 
-        @InputProperty("Min level (this level and above): debug, info, default, error, fault. `error` matches error+fault, not error alone.")
+        @InputProperty(
+            "Min level (this level and above): debug, info, default, error, fault. `error` matches error+fault, not error alone."
+        )
         var level: String?
 
         @InputProperty("Regex filter on message (client-side).")
@@ -260,13 +297,17 @@ enum SlogTools {
         @InputProperty("Regex exclusion on message, e.g. 'heartbeat|keepalive'.")
         var exclude_grep: String?
 
-        @InputProperty("Max entries retained for `entries`/`head`/`tail`/`output_file` (default 500). Summary always scans the full population up to 100k events.")
+        @InputProperty(
+            "Max entries retained for `entries`/`head`/`tail`/`output_file` (default 500). Summary always scans the full population up to 100k events."
+        )
         var limit: Int?
 
         @InputProperty("Path to a .logarchive file (alternative to `last`/`start`).")
         var archive_path: String?
 
-        @InputProperty("Re-query a previous `output_file` instead of scanning the OS log database. Cheap iterative drill-down. Mutex with `last`/`start`/`end`/`archive_path`.")
+        @InputProperty(
+            "Re-query a previous `output_file` instead of scanning the OS log database. Cheap iterative drill-down. Mutex with `last`/`start`/`end`/`archive_path`."
+        )
         var source_file: String?
 
         @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
@@ -280,7 +321,9 @@ enum SlogTools {
     }
 
     struct StreamArgs: MCPToolInput {
-        @InputProperty("Process name(s), array, OR-matched, exact case-sensitive match. e.g. [\"Finder\", \"Dock\"]. Skip `slog_list_processes` if you have a confident name.")
+        @InputProperty(
+            "Process name(s), array, OR-matched, exact case-sensitive match. e.g. [\"Finder\", \"Dock\"]. Skip `slog_list_processes` if you have a confident name."
+        )
         var process: [String]?
 
         @InputProperty("Process ID.")
@@ -292,7 +335,9 @@ enum SlogTools {
         @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem`.")
         var category: [String]?
 
-        @InputProperty("Min level (this level and above): debug, info, default, error, fault. `error` matches error+fault, not error alone.")
+        @InputProperty(
+            "Min level (this level and above): debug, info, default, error, fault. `error` matches error+fault, not error alone."
+        )
         var level: String?
 
         @InputProperty("Regex filter on message (client-side).")
@@ -301,7 +346,9 @@ enum SlogTools {
         @InputProperty("Regex exclusion on message, e.g. 'heartbeat|keepalive'.")
         var exclude_grep: String?
 
-        @InputProperty("Stop early after this many entries (1–1000). Omit to run until `timeout`; the call still caps at 1000 to bound memory.")
+        @InputProperty(
+            "Stop early after this many entries (1–1000). Omit to run until `timeout`; the call still caps at 1000 to bound memory."
+        )
         var count: Int?
 
         @InputProperty("Max wait seconds (default 30). Returns whatever is captured on timeout.")
@@ -339,6 +386,49 @@ enum SlogTools {
         var all: Bool?
     }
 
+    struct SignpostArgs: MCPToolInput {
+        @InputProperty(
+            "Time range for the persisted query: duration ('5m', '1h') or 'boot'. Ignored when `live: true`."
+        )
+        var last: String?
+
+        @InputProperty("Range start, e.g. '2024-01-15 10:30:00'. Use with `end` instead of `last`.")
+        var start: String?
+
+        @InputProperty("Range end. Omit to query to now.")
+        var end: String?
+
+        @InputProperty("Path to a .logarchive file (alternative to `last`/`start`).")
+        var archive_path: String?
+
+        @InputProperty(
+            "Subsystem(s), array, OR-matched. Strongly recommended — signposts are keyed by subsystem (e.g. [\"com.myapp\"])."
+        )
+        var subsystem: [String]?
+
+        @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem` (e.g. [\"perf\"]).")
+        var category: [String]?
+
+        @InputProperty("Process name(s), array, OR-matched, exact case-sensitive match.")
+        var process: [String]?
+
+        @InputProperty("Process ID.")
+        var pid: Int?
+
+        @InputProperty(
+            "Capture live instead of querying history. Pairs begin/end as events arrive and needs no persistence — the reliable path right after exercising the app."
+        )
+        var live: Bool?
+
+        @InputProperty("Live capture seconds (default 10, max 60). Only with `live: true`.")
+        var timeout: Int?
+
+        @InputProperty(
+            "Include per-occurrence detail (start, duration_ms, message) for each interval. Default false: aggregate stats only (token-cheap)."
+        )
+        var full: Bool?
+    }
+
     // MARK: - Tools
 
     static let show = MCPTool(
@@ -347,28 +437,28 @@ enum SlogTools {
         Query historical/persisted macOS logs. Requires one source: `last`, \
         `start`/`end`, `archive_path`, or `source_file` (a previous `output_file`). \
         Filtering by `subsystem` auto-includes debug+info.
-
+        
         **Iterative drill-down:** pass a previous call's `output_file` back as `source_file` \
         to re-filter/re-summarize the NDJSON spill without re-scanning the OS log database. \
         Same filter args apply; mutex with `last`/`start`/`end`/`archive_path`.
-
+        
         **Tailing:** every response includes `next_since` (latest matched timestamp + 1µs, \
         or null if no matches). Chain calls by passing it as the next `start` to fetch only \
         what's new; works in `summary_only` mode too.
-
+        
         Response: `{ count, elapsed_ms, scan_capped, truncated, summary, entries?, head?, tail?, output_file?, hint? }`.
           - ≤50 entries → inline as `entries`.
           - >50 entries → `summary` (time range, by_level, top processes/subsystems/categories) + `head`/`tail` (10 each) + full payload as NDJSON at `output_file`. Drill in with `Read offset/limit` or `jq`; do not slurp.
           - `full: true` → inline every entry.
           - `summary_only: true` → just `{ count, elapsed_ms, scan_capped, summary, hint? }`. Use for aggregate questions. Mutex with `full`.
-
+        
         `summary` always covers the full matched population, scanning up to 100,000 events. \
         `scan_capped: true` warns if that ceiling was hit — narrow the window. `limit` only caps retained entries.
-
+        
         `hint` appears only when `count == 0`. Custom (non-Apple) subsystems don't persist debug \
         events by default; if `slog_show` returns 0 from one, use `slog_stream` for live capture \
         or pre-enable persistence via `sudo log config --subsystem <name> --mode persist:debug`.
-
+        
         On system-level failure (log CLI missing, permission denied, etc.) the error payload \
         includes `try_doctor: true` — call `slog_doctor` once and surface its findings before retrying.
         """
@@ -562,20 +652,20 @@ enum SlogTools {
         description: """
         Stream live macOS/iOS logs with bounded capture. Use for real-time debugging or \
         capturing debug events from custom subsystems (which `slog_show` can't replay).
-
+        
         `count` is optional (1–1000). Returns when count is met or `timeout` (default 30s) \
         elapses; omit `count` to run until timeout (still capped at 1000 to bound memory). \
         Filtering by `subsystem` auto-includes debug+info. iOS Simulator via `simulator: true`.
-
+        
         Response: `{ captured, requested, stopped_by, elapsed_ms, truncated, summary, entries?, head?, tail?, output_file? }`.
           - Envelope mirrors `slog_show`: ≤50 inline as `entries`; >50 → `summary` + `head`/`tail` + NDJSON at `output_file`. `full: true` inlines every entry.
           - `stopped_by`: `count` (success) | `timeout` | `exhausted` (rare) | `error`.
-
+        
         When `captured == 0`, inspect `elapsed_ms` and `stopped_by` before retrying with a wider window.
-
+        
         When `stopped_by == "error"`, the response carries `error_message` (raw failure text); \
         if also `captured == 0`, `try_doctor: true` flags a likely system/permission cause.
-
+        
         On startup failure (simctl missing, no booted simulator, etc.) the error payload \
         includes `try_doctor: true` — call `slog_doctor` once and surface its findings before retrying.
         """
@@ -718,12 +808,159 @@ enum SlogTools {
         return try json(result)
     }
 
+    static let signpost = MCPTool(
+        name: "slog_signpost",
+        description: """
+        Report os_signpost interval durations (begin/end pairs) for a subsystem/category — \
+        the timing data behind `OSSignposter.beginInterval`/`endInterval`, without opening Instruments.
+        
+        Two modes:
+          - **Persisted query** (default): pass `last`/`start`+`end`/`archive_path`. Reads the \
+        persisted store. Custom-subsystem signposts may need `sudo log config --subsystem <name> --mode persist:debug` first.
+          - **Live capture** (`live: true`): pairs intervals as events arrive over `timeout` \
+        seconds (default 10). Needs no persistence — the reliable path right after driving the app.
+        
+        Pairs begin↔end by (process, signpost name, signpost id), so concurrent same-name \
+        intervals stay distinct. Unmatched begins are returned as in-flight (`duration_ms: null`).
+        
+        Response: `{ count, in_flight, orphan_ends, elapsed_ms, mode, intervals, hint? }`. \
+        `intervals` is grouped by name: `{ name, subsystem, category, count, in_flight, min_ms, \
+        p50_ms, max_ms, total_ms }`. Set `full: true` to add per-occurrence `occurrences` \
+        (start, duration_ms, message). `hint` appears only when `count == 0`.
+        """
+    ) { (args: SignpostArgs) in
+        let live = args.live ?? false
+
+        if !live, args.last == nil, args.start == nil, args.archive_path == nil {
+            return errorJSON("Specify 'last', 'start', or 'archive_path' (or set 'live: true' for live capture)")
+        }
+
+        let setup: FilterSetup
+        do {
+            setup = try FilterSetup.build(
+                processes: args.process ?? [],
+                pid: args.pid,
+                subsystems: args.subsystem ?? [],
+                categories: args.category ?? [],
+                signpost: true
+            )
+        } catch let error as FilterSetupError {
+            return errorJSON(error.errorDescription ?? "\(error)")
+        } catch {
+            return errorJSON("\(error)")
+        }
+
+        let started = Date()
+        var aggregator = SignpostAggregator()
+        var stoppedBy: String?
+        var errorMessage: String?
+        var tryDoctor: Bool?
+
+        if live {
+            let timeoutSeconds = min(max(args.timeout ?? 10, 1), 60)
+            let config = StreamConfiguration(
+                target: .local,
+                predicate: setup.predicate,
+                includeInfo: setup.includeInfo,
+                includeDebug: setup.includeDebug,
+                includeSignposts: true
+            )
+            let container = SendableEntryContainer()
+            let timedOut = SendableBoolFlag()
+
+            let streamTask = Task {
+                for try await entry in LogStreamer().stream(configuration: config) {
+                    container.append(entry)
+                    if container.count >= signpostLiveCap { break }
+                }
+            }
+            let timeoutTask = Task {
+                try await Task.sleep(for: .seconds(timeoutSeconds))
+                timedOut.set()
+                streamTask.cancel()
+            }
+            let streamResult = await streamTask.result
+            timeoutTask.cancel()
+
+            if case let .failure(error) = streamResult, !(error is CancellationError) {
+                stoppedBy = "error"
+                errorMessage = error.localizedDescription
+                if container.count == 0 { tryDoctor = true }
+            } else {
+                stoppedBy = timedOut.get() ? "timeout" : "exhausted"
+            }
+            aggregator.ingest(container.entries)
+        } else {
+            let timeRange: ShowConfiguration.TimeRange? = if let last = args.last {
+                last.lowercased() == "boot" ? .lastBoot : .last(last)
+            } else if let start = args.start {
+                args.end.map { ShowConfiguration.TimeRange.range(start: start, end: $0) } ?? .start(start)
+            } else {
+                nil
+            }
+            let config = ShowConfiguration(
+                timeRange: timeRange,
+                archivePath: args.archive_path,
+                predicate: setup.predicate,
+                includeInfo: setup.includeInfo,
+                includeDebug: setup.includeDebug,
+                includeSignposts: true
+            )
+            do {
+                for try await entry in LogReader().read(configuration: config) {
+                    aggregator.ingest(entry)
+                }
+            } catch {
+                return errorJSON(error.localizedDescription, tryDoctor: true)
+            }
+        }
+
+        let summaries = aggregator.summaries()
+        let includeOccurrences = args.full ?? false
+        let intervals = summaries.map { FormattedSignpost(from: $0, includeOccurrences: includeOccurrences) }
+        let totalCount = summaries.reduce(0) { $0 + $1.count }
+        let inFlight = summaries.reduce(0) { $0 + $1.inFlightCount }
+        let hint = totalCount == 0 ? emptySignpostHint(live: live) : nil
+
+        return try json(SignpostResult(
+            count: totalCount,
+            inFlight: inFlight,
+            orphanEnds: aggregator.orphanEndCount,
+            elapsedMs: Int(Date().timeIntervalSince(started) * 1000),
+            mode: live ? "stream" : "show",
+            intervals: intervals,
+            hint: hint,
+            stoppedBy: stoppedBy,
+            errorMessage: errorMessage,
+            tryDoctor: tryDoctor
+        ))
+    }
+
+    /// Cap on signpost events buffered during a single live capture. Bounds
+    /// memory between timeout ticks for a chatty target.
+    private static let signpostLiveCap = 100_000
+
+    /// Hint when `slog_signpost` finds nothing — differs by mode.
+    private static func emptySignpostHint(live: Bool) -> String {
+        if live {
+            return """
+            No signpost intervals captured. Confirm the process emits os_signpost intervals \
+            under this subsystem/category and that you exercised it during the capture window.
+            """
+        }
+        return """
+        No signpost intervals found. Custom-subsystem signposts often aren't persisted by default — \
+        capture live with `live: true` while exercising the app, or pre-enable persistence via \
+        `sudo log config --subsystem <name> --mode persist:debug`.
+        """
+    }
+
     static let listProcesses = MCPTool(
         name: "slog_list_processes",
         description: """
         List running macOS processes. Call first to discover names for `slog_show`/`slog_stream` \
         `process` arg. Use `filter` to narrow by name substring before truncation kicks in.
-
+        
         Response: `{ count, truncated, processes?, head?, tail?, output_file? }`.
           - ≤50 → inline as `processes`.
           - >50 → `head`/`tail` (10 each, alphabetical) + full list as NDJSON at `output_file`.
@@ -777,6 +1014,7 @@ enum SlogTools {
     static let all: [MCPTool] = [
         show,
         stream,
+        signpost,
         listProcesses,
         listSimulators,
         doctor

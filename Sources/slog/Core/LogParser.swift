@@ -194,6 +194,10 @@ private struct RawLogEntry: Decodable {
     let threadID: Int?
     let traceID: Int?
     let source: SourceInfo?
+    let signpostID: UInt64?
+    let signpostName: String?
+    let signpostType: String?
+    let signpostScope: String?
 
     struct SourceInfo: Decodable {
         let symbol: String?
@@ -257,7 +261,11 @@ private struct RawLogEntry: Decodable {
             processImagePath: processImagePath,
             senderImagePath: senderImagePath,
             eventType: eventType,
-            source: source?.formatted()
+            source: source?.formatted(),
+            signpostID: signpostID,
+            signpostName: signpostName,
+            signpostType: signpostType.flatMap(SignpostType.init(string:)),
+            signpostScope: signpostScope
         )
     }
 

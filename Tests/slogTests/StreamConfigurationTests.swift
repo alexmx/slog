@@ -105,6 +105,22 @@ struct LogStreamerCommandTests {
     }
 
     @Test
+    func signpostFlag() {
+        let config = StreamConfiguration(includeSignposts: true)
+        let (_, args) = streamer.buildCommand(for: config)
+
+        #expect(args.contains("--signpost"))
+    }
+
+    @Test
+    func noSignpostFlag() {
+        let config = StreamConfiguration()
+        let (_, args) = streamer.buildCommand(for: config)
+
+        #expect(!args.contains("--signpost"))
+    }
+
+    @Test
     func predicateArg() {
         let config = StreamConfiguration(predicate: "subsystem BEGINSWITH \"com.test\"")
         let (_, args) = streamer.buildCommand(for: config)

@@ -56,6 +56,27 @@ extension LogLevel: ExpressibleByArgument {
     }
 }
 
+/// The kind of an `os_signpost` event, as reported by `log --signpost`.
+///
+/// Interval timing is reconstructed by pairing a `.begin` with the matching
+/// `.end` (same process, signpost name, and signpost ID). `.event` is a
+/// standalone marker, not part of an interval.
+public enum SignpostType: String, Codable, CaseIterable, Sendable, Equatable {
+    case begin
+    case end
+    case event
+
+    /// Map a raw NDJSON `signpostType` value, tolerating unknown strings.
+    public init?(string: String) {
+        switch string.lowercased() {
+        case "begin": self = .begin
+        case "end": self = .end
+        case "event": self = .event
+        default: return nil
+        }
+    }
+}
+
 /// Represents a single parsed log entry from the log stream
 public struct LogEntry: Codable, Sendable, Equatable {
     /// Timestamp of the log entry
@@ -100,6 +121,21 @@ public struct LogEntry: Codable, Sendable, Equatable {
     /// Source location info (file/function/line when --source is used)
     public let source: String?
 
+    /// Signpost instance identifier, present when `eventType == "signpostEvent"`.
+    /// Distinguishes concurrent intervals that share the same name. `UInt64`
+    /// because event-type signpost IDs can exceed `Int64`.
+    public let signpostID: UInt64?
+
+    /// Signpost name (e.g., "parse.postImage"), present for signpost events.
+    public let signpostName: String?
+
+    /// Whether this signpost event begins an interval, ends one, or is a
+    /// standalone event.
+    public let signpostType: SignpostType?
+
+    /// Signpost scope (e.g., "process", "thread", "system").
+    public let signpostScope: String?
+
     public init(
         timestamp: Date,
         processName: String,
@@ -114,7 +150,11 @@ public struct LogEntry: Codable, Sendable, Equatable {
         processImagePath: String? = nil,
         senderImagePath: String? = nil,
         eventType: String? = nil,
-        source: String? = nil
+        source: String? = nil,
+        signpostID: UInt64? = nil,
+        signpostName: String? = nil,
+        signpostType: SignpostType? = nil,
+        signpostScope: String? = nil
     ) {
         self.timestamp = timestamp
         self.processName = processName
@@ -130,6 +170,10 @@ public struct LogEntry: Codable, Sendable, Equatable {
         self.senderImagePath = senderImagePath
         self.eventType = eventType
         self.source = source
+        self.signpostID = signpostID
+        self.signpostName = signpostName
+        self.signpostType = signpostType
+        self.signpostScope = signpostScope
     }
 }
 

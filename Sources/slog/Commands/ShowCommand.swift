@@ -64,6 +64,9 @@ struct ShowCommand: AsyncParsableCommand {
     @Flag(name: .long, inversion: .prefixedNo, help: "Collapse consecutive identical messages")
     var dedup: Bool?
 
+    @Flag(name: .long, help: "Report os_signpost interval durations instead of log messages")
+    var signpost: Bool = false
+
     // MARK: - Time Range Options
 
     @Option(name: .long, help: "Show logs from last duration or boot (e.g., 5m, 1h, boot)")
@@ -145,7 +148,8 @@ struct ShowCommand: AsyncParsableCommand {
             grep: effectiveGrep,
             excludeGrep: effectiveExcludeGrep,
             info: effectiveInfo,
-            debug: effectiveDebug
+            debug: effectiveDebug,
+            signpost: signpost
         )
 
         // Determine time range
@@ -172,12 +176,19 @@ struct ShowCommand: AsyncParsableCommand {
             predicate: setup.predicate,
             includeInfo: setup.includeInfo,
             includeDebug: setup.includeDebug,
-            includeSource: effectiveSource
+            includeSource: effectiveSource,
+            includeSignposts: signpost
         )
 
         // Create reader and iterate
         let reader = LogReader()
         let stream = reader.read(configuration: config)
+
+        // Signpost mode: aggregate begin/end events into interval durations.
+        if signpost {
+            try await runSignpost(stream: stream, format: effectiveFormat)
+            return
+        }
 
         var entryCount = 0
         do {
@@ -205,5 +216,29 @@ struct ShowCommand: AsyncParsableCommand {
 
         // Flush any buffered dedup output
         dedupWriter?.flush()
+    }
+
+    /// Drain the stream into a SignpostAggregator and print the interval table.
+    /// The server-side predicate already restricts to signpost events, so every
+    /// entry is ingested directly.
+    private func runSignpost(
+        stream: AsyncThrowingStream<LogEntry, Error>,
+        format: OutputFormat
+    ) async throws {
+        var aggregator = SignpostAggregator()
+        do {
+            for try await entry in stream {
+                aggregator.ingest(entry)
+            }
+        } catch is CancellationError {
+            // Cancelled — render whatever was collected.
+        }
+
+        let output = SignpostFormatter.render(
+            aggregator.summaries(),
+            format: format,
+            orphanEndCount: aggregator.orphanEndCount
+        )
+        print(output)
     }
 }

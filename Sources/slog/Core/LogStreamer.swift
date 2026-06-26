@@ -34,18 +34,24 @@ public struct StreamConfiguration: Sendable, Equatable {
     /// Whether to include source location info
     public let includeSource: Bool
 
+    /// Whether to surface `os_signpost` events (passes `--signpost`; they are
+    /// not streamed otherwise)
+    public let includeSignposts: Bool
+
     public init(
         target: Target = .local,
         predicate: String? = nil,
         includeInfo: Bool = true,
         includeDebug: Bool = false,
-        includeSource: Bool = false
+        includeSource: Bool = false,
+        includeSignposts: Bool = false
     ) {
         self.target = target
         self.predicate = predicate
         self.includeInfo = includeInfo
         self.includeDebug = includeDebug
         self.includeSource = includeSource
+        self.includeSignposts = includeSignposts
     }
 }
 
@@ -115,6 +121,10 @@ public struct LogStreamer: Sendable {
             args.append("--source")
         }
 
+        if configuration.includeSignposts {
+            args.append("--signpost")
+        }
+
         if let predicate = configuration.predicate {
             args.append("--predicate")
             args.append(predicate)
@@ -175,6 +185,11 @@ public struct PredicateBuilder: Sendable {
         appendOred(values.map { "category == \"\($0)\"" })
     }
 
+    /// Restrict to `os_signpost` events (begin/end/event records).
+    public mutating func signpostsOnly() {
+        components.append("eventType == \"signpostEvent\"")
+    }
+
     private mutating func appendOred(_ parts: [String]) {
         guard !parts.isEmpty else { return }
         components.append(parts.count == 1 ? parts[0] : "(\(parts.joined(separator: " OR ")))")
@@ -210,7 +225,8 @@ public struct PredicateBuilder: Sendable {
         pid: Int? = nil,
         subsystems: [String] = [],
         categories: [String] = [],
-        level: LogLevel? = nil
+        level: LogLevel? = nil,
+        signpostOnly: Bool = false
     ) -> String? {
         var builder = PredicateBuilder()
 
@@ -220,8 +236,13 @@ public struct PredicateBuilder: Sendable {
         }
         builder.subsystems(subsystems)
         builder.categories(categories)
-        if let level {
+        // Skip the messageType/level constraint in signpost mode — signpost
+        // events carry a different messageType and would be filtered out.
+        if let level, !signpostOnly {
             builder.level(level)
+        }
+        if signpostOnly {
+            builder.signpostsOnly()
         }
 
         return builder.build()

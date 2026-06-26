@@ -95,6 +95,22 @@ struct LogReaderCommandTests {
     }
 
     @Test
+    func signpostFlag() {
+        let config = ShowConfiguration(includeSignposts: true)
+        let args = reader.buildArguments(for: config)
+
+        #expect(args.contains("--signpost"))
+    }
+
+    @Test
+    func signpostFlagOffByDefault() {
+        let config = ShowConfiguration()
+        let args = reader.buildArguments(for: config)
+
+        #expect(!args.contains("--signpost"))
+    }
+
+    @Test
     func lastDurationArg() {
         let config = ShowConfiguration(timeRange: .last("5m"))
         let args = reader.buildArguments(for: config)

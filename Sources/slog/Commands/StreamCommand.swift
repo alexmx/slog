@@ -74,6 +74,9 @@ struct StreamCommand: AsyncParsableCommand {
     @Flag(name: .long, inversion: .prefixedNo, help: "Collapse consecutive identical messages")
     var dedup: Bool?
 
+    @Flag(name: .long, help: "Report os_signpost interval durations instead of log messages")
+    var signpost: Bool = false
+
     // MARK: - Timing Options
 
     @Option(name: .long, help: "Maximum wait time for first log entry (e.g., 5s, 1m)")
@@ -141,7 +144,8 @@ struct StreamCommand: AsyncParsableCommand {
             grep: effectiveGrep,
             excludeGrep: effectiveExcludeGrep,
             info: effectiveInfo,
-            debug: effectiveDebug
+            debug: effectiveDebug,
+            signpost: signpost
         )
 
         // Determine target
@@ -159,7 +163,8 @@ struct StreamCommand: AsyncParsableCommand {
             predicate: setup.predicate,
             includeInfo: setup.includeInfo,
             includeDebug: setup.includeDebug,
-            includeSource: effectiveSource
+            includeSource: effectiveSource,
+            includeSignposts: signpost
         )
 
         // Parse timing options
@@ -167,8 +172,12 @@ struct StreamCommand: AsyncParsableCommand {
         let captureInterval = try capture.map { try DurationParser.parse($0, optionName: "--capture") }
         let maxCount = count
 
-        // Create dedup writer if enabled
-        let dedupWriter = effectiveDedup ? DedupWriter(formatter: formatter) : nil
+        // Create dedup writer if enabled (not used in signpost mode)
+        let dedupWriter = (effectiveDedup && !signpost) ? DedupWriter(formatter: formatter) : nil
+
+        // Signpost mode aggregates begin/end events into intervals, printed once
+        // the stream stops (via timeout/capture/count).
+        let signpostCollector = signpost ? SignpostCollector() : nil
 
         // Create streamer
         let streamer = LogStreamer()
@@ -180,10 +189,16 @@ struct StreamCommand: AsyncParsableCommand {
             filterChain: setup.filterChain,
             formatter: formatter,
             dedupWriter: dedupWriter,
+            signpostCollector: signpostCollector,
             timeoutInterval: timeoutInterval,
             captureInterval: captureInterval,
             maxCount: maxCount
         )
+
+        if let signpostCollector {
+            let (summaries, orphanEnds) = await signpostCollector.result()
+            print(SignpostFormatter.render(summaries, format: effectiveFormat, orphanEndCount: orphanEnds))
+        }
 
         if exitCode != 0 {
             throw ExitCode(Int32(exitCode))
@@ -197,6 +212,7 @@ struct StreamCommand: AsyncParsableCommand {
         filterChain: FilterChain,
         formatter: LogFormatter,
         dedupWriter: DedupWriter?,
+        signpostCollector: SignpostCollector? = nil,
         timeoutInterval: TimeInterval?,
         captureInterval: TimeInterval?,
         maxCount: Int?
@@ -220,7 +236,11 @@ struct StreamCommand: AsyncParsableCommand {
 
                     await state.recordEntry()
 
-                    if let dedupWriter {
+                    if let signpostCollector {
+                        // Predicate already restricts to signpost events; collect
+                        // for end-of-stream aggregation instead of printing.
+                        await signpostCollector.ingest(entry)
+                    } else if let dedupWriter {
                         dedupWriter.write(entry)
                     } else {
                         let output = formatter.format(entry)
@@ -290,6 +310,22 @@ struct StreamCommand: AsyncParsableCommand {
         case .timeout, .error: return 1
         case .none, .captureComplete, .countReached: return 0
         }
+    }
+}
+
+// MARK: - Signpost Collector
+
+/// Thread-safe wrapper around `SignpostAggregator` for the streaming path,
+/// where entries arrive on a separate task.
+private actor SignpostCollector {
+    private var aggregator = SignpostAggregator()
+
+    func ingest(_ entry: LogEntry) {
+        aggregator.ingest(entry)
+    }
+
+    func result() -> (summaries: [SignpostSummary], orphanEnds: Int) {
+        (aggregator.summaries(), aggregator.orphanEndCount)
     }
 }
 

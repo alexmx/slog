@@ -21,6 +21,9 @@ let databaseLogger = Logger(subsystem: "com.slog.test.database", category: "quer
 let authLogger = Logger(subsystem: "com.slog.test", category: "auth")
 let performanceLogger = Logger(subsystem: "com.slog.test", category: "performance")
 
+/// Signposter for os_signpost interval testing (separate from os_log messages).
+let signposter = OSSignposter(subsystem: "com.slog.test", category: "signpost")
+
 // MARK: - Log Emission
 
 func emitTestLogs(batch: Int) {
@@ -63,6 +66,55 @@ func emitTestLogs(batch: Int) {
     defaultLogger.log("\(prefix, privacy: .public)Processing file: report_2026-Q1_final (v2).pdf")
 }
 
+// MARK: - Signpost Emission
+
+//
+// Emits os_signpost *intervals* (begin/end pairs) — a different substrate than
+// os_log messages. Each interval is two separate log events sharing
+// (subsystem, category, name, signpostID); the consumer pairs begin->end by ID
+// and computes duration = end.ts - begin.ts.
+//
+// Covers the three cases a pairing implementation must handle:
+//   1. Simple sequential interval with interpolated args.
+//   2. Two CONCURRENT same-name intervals with distinct IDs (must NOT collapse).
+//   3. An in-flight begin with no matching end (duration should be null).
+// Plus a standalone signpost event (not an interval).
+
+func emitSignposts(batch: Int) {
+    let suffix = batch > 0 ? " batch=\(batch)" : ""
+
+    // 1. Sequential interval with args.
+    let id1 = signposter.makeSignpostID()
+    let s1 = signposter.beginInterval(
+        "parse.postImage",
+        id: id1,
+        "len \(208_123, privacy: .public)\(suffix, privacy: .public)"
+    )
+    Thread.sleep(forTimeInterval: 0.04)
+    signposter.endInterval("parse.postImage", s1)
+
+    // 2. Concurrent same-name intervals, distinct IDs, overlapping lifetimes.
+    let idA = signposter.makeSignpostID()
+    let idB = signposter.makeSignpostID()
+    let a = signposter.beginInterval("attr.chunk", id: idA, "start \(0, privacy: .public)\(suffix, privacy: .public)")
+    let b = signposter.beginInterval(
+        "attr.chunk",
+        id: idB,
+        "start \(4096, privacy: .public)\(suffix, privacy: .public)"
+    )
+    Thread.sleep(forTimeInterval: 0.010)
+    signposter.endInterval("attr.chunk", a)
+    Thread.sleep(forTimeInterval: 0.005)
+    signposter.endInterval("attr.chunk", b)
+
+    // 3. In-flight begin: intentionally never ended (state dropped).
+    let id3 = signposter.makeSignpostID()
+    _ = signposter.beginInterval("render.draw", id: id3, "frame \(1, privacy: .public)\(suffix, privacy: .public)")
+
+    // Standalone signpost event (not an interval).
+    signposter.emitEvent("checkpoint", "phase init\(suffix, privacy: .public)")
+}
+
 let entriesPerBatch = 21
 
 // MARK: - CLI
@@ -77,6 +129,8 @@ if args.contains("--help") || args.contains("-h") {
       slog-test-emitter                 Emit all test logs once
       slog-test-emitter --repeat N      Repeat N times (1s interval)
       slog-test-emitter --continuous    Emit every second until Ctrl+C
+      slog-test-emitter --signpost      Emit os_signpost intervals instead of os_log messages
+                                        (combine with --repeat / --continuous)
     
     Subsystems emitted:
       com.slog.test              (categories: general, auth, performance)
@@ -89,6 +143,7 @@ if args.contains("--help") || args.contains("-h") {
 }
 
 let continuous = args.contains("--continuous")
+let signpostMode = args.contains("--signpost")
 var repeatCount = 1
 
 if let idx = args.firstIndex(of: "--repeat"), idx + 1 < args.count,
@@ -96,15 +151,38 @@ if let idx = args.firstIndex(of: "--repeat"), idx + 1 < args.count,
     repeatCount = count
 }
 
+/// Emit one batch of the active mode (signposts or os_log messages).
+func emitBatch(_ batch: Int) {
+    if signpostMode {
+        emitSignposts(batch: batch)
+    } else {
+        emitTestLogs(batch: batch)
+    }
+}
+
 if continuous {
-    print("Emitting test logs continuously (Ctrl+C to stop)...")
+    let kind = signpostMode ? "signpost intervals" : "test logs"
+    print("Emitting \(kind) continuously (Ctrl+C to stop)...")
     var batch = 1
     while true {
-        emitTestLogs(batch: batch)
-        print("  Batch \(batch) emitted (\(entriesPerBatch) log entries)")
+        emitBatch(batch)
+        print("  Batch \(batch) emitted")
         batch += 1
         Thread.sleep(forTimeInterval: 1.0)
     }
+} else if signpostMode {
+    for i in 0..<repeatCount {
+        emitSignposts(batch: repeatCount > 1 ? i + 1 : 0)
+        if repeatCount > 1 {
+            print("  Batch \(i + 1) emitted")
+            if i < repeatCount - 1 { Thread.sleep(forTimeInterval: 1.0) }
+        }
+    }
+    print("Emitted signpost intervals (parse.postImage, attr.chunk x2 concurrent, render.draw in-flight) + 1 event")
+    print("")
+    print("Capture intervals with the OS log CLI (signposts are skipped without --signpost):")
+    print("  log show --last 30s --signpost --style ndjson --predicate 'subsystem == \"com.slog.test\"'")
+    print("  log stream --signpost --style ndjson --predicate 'subsystem == \"com.slog.test\"'")
 } else {
     for i in 0..<repeatCount {
         emitTestLogs(batch: repeatCount > 1 ? i + 1 : 0)
