@@ -30,6 +30,45 @@ struct FilterSetupTests {
         #expect(setup.includeInfo == false)
     }
 
+    // MARK: - Level-Driven Inclusion
+
+    //
+    // `--level` is a minimum severity; asking for a debug/info floor must also
+    // make the `log` subprocess emit those levels, or the query captures nothing.
+
+    @Test("level: .debug captures debug (and info), even without a subsystem")
+    func levelDebugEnablesDebug() throws {
+        let withSubsystem = try FilterSetup.build(subsystems: ["com.apple.network"], level: .debug)
+        #expect(withSubsystem.includeDebug == true)
+        #expect(withSubsystem.includeInfo == true)
+
+        // The original footgun: process-only + level debug used to capture nothing.
+        let processOnly = try FilterSetup.build(processes: ["Finder"], level: .debug)
+        #expect(processOnly.includeDebug == true)
+        #expect(processOnly.includeInfo == true)
+
+        // And with no filters at all.
+        let bare = try FilterSetup.build(level: .debug)
+        #expect(bare.includeDebug == true)
+        #expect(bare.includeInfo == true)
+    }
+
+    @Test("level: .info captures info but not debug")
+    func levelInfoEnablesInfoOnly() throws {
+        let setup = try FilterSetup.build(processes: ["Finder"], level: .info)
+        #expect(setup.includeInfo == true)
+        #expect(setup.includeDebug == false)
+    }
+
+    @Test("level: .default/.error/.fault need neither info nor debug emission")
+    func levelDefaultAndAboveNoInfoDebug() throws {
+        for level in [LogLevel.default, .error, .fault] {
+            let setup = try FilterSetup.build(processes: ["Finder"], level: level)
+            #expect(setup.includeDebug == false)
+            #expect(setup.includeInfo == false)
+        }
+    }
+
     @Test
     func noAutoDebugWithInfoFlag() throws {
         let setup = try FilterSetup.build(

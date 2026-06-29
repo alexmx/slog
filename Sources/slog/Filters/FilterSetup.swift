@@ -26,9 +26,13 @@ public struct FilterSetup: Sendable {
     /// OR-grouped in the resulting predicate. Pass already-parsed arrays — callers
     /// dealing with comma-separated CLI/profile strings should run `splitCSV` first.
     ///
-    /// Consolidates PredicateBuilder, FilterChain grep/excludeGrep, and auto-debug logic.
-    /// Auto-debug: when a subsystem is set without explicit level or info/debug flags,
-    /// debug and info messages are automatically included.
+    /// Consolidates PredicateBuilder, FilterChain grep/excludeGrep, and log-level
+    /// inclusion logic. Two paths enable debug/info emission:
+    /// - **Auto-debug:** a subsystem filter with no explicit level/info/debug flags
+    ///   automatically includes debug+info.
+    /// - **Level-driven:** `level: .debug` includes debug+info; `level: .info`
+    ///   includes info. A `level` of `.debug`/`.info` capturing nothing would be a
+    ///   footgun, so the requested minimum level drives emission directly.
     public static func build(
         processes: [String] = [],
         pid: Int? = nil,
@@ -79,10 +83,21 @@ public struct FilterSetup: Sendable {
             catch { throw FilterSetupError.invalidRegex(field: "exclude_grep", reason: error.localizedDescription) }
         }
 
-        // Signpost mode includes info+debug so debug-scoped signposts surface.
+        // `--level` is a MINIMUM severity. When that minimum is at or below
+        // info/debug, the `log` subprocess must also be told to EMIT those levels
+        // (its --info/--debug flags) — otherwise the predicate floor matches a
+        // level the OS never streamed, so e.g. `--level debug` would capture zero
+        // debug events. Derive the inclusion flags from the requested level.
+        let levelNeedsInfo = level == .debug || level == .info
+        let levelNeedsDebug = level == .debug
+
+        // Auto-debug: a bare subsystem filter (no explicit level or info/debug
+        // flags) opts into debug+info so custom-subsystem chatter surfaces without
+        // extra flags. Signpost mode always includes them so debug-scoped
+        // signposts surface.
         let autoDebug = signpost || (!subsystems.isEmpty && level == nil && !info && !debug)
-        let includeDebug = debug || autoDebug
-        let includeInfo = info || includeDebug
+        let includeDebug = debug || autoDebug || levelNeedsDebug
+        let includeInfo = info || includeDebug || levelNeedsInfo
 
         return FilterSetup(
             predicate: predicate,
