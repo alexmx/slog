@@ -117,6 +117,69 @@ func emitSignposts(batch: Int) {
 
 let entriesPerBatch = 21
 
+// MARK: - Smoke Test (logging-mechanism visibility)
+
+///
+/// Emits exactly one line through every distinct Apple logging mechanism, each
+/// tagged `SMOKE|<nonce>|<id>` so a harness can grep which mechanisms are visible
+/// to slog / the unified log and which are not. The nonce isolates a single run.
+///
+/// Mechanisms grouped by substrate:
+///   - stdout/stderr  : print, debugPrint, FileHandle.standardError, fputs — NOT
+///                      part of unified logging (slog can never see these).
+///   - NSLog          : bridges to unified logging, but with NO subsystem/category.
+///   - os_log (C API) : default/info/debug/error/fault via OSLog object.
+///   - os.Logger      : trace/debug/info/notice/warning/error/critical/fault.
+///   - privacy        : default-private interpolation (redaction) vs .public.
+///   - os_signpost    : interval begin/end + standalone event (need --signpost).
+///
+func emitSmoke(nonce: String) {
+    func tag(_ id: String) -> String {
+        "SMOKE|\(nonce)|\(id)"
+    }
+
+    // --- stdout / stderr (NOT part of unified logging) ---
+    print(tag("print_stdout"))
+    debugPrint(tag("debugprint_stdout"))
+    FileHandle.standardError.write(Data((tag("filehandle_stderr") + "\n").utf8))
+    fputs(tag("fputs_stderr") + "\n", stderr)
+
+    // --- NSLog (bridges to unified logging; empty subsystem/category) ---
+    NSLog("%@", tag("nslog"))
+
+    // --- os_log C API (subsystem com.slog.smoke, category oslog) ---
+    let osLog = OSLog(subsystem: "com.slog.smoke", category: "oslog")
+    os_log("%{public}@", log: osLog, type: .default, tag("oslog_default"))
+    os_log("%{public}@", log: osLog, type: .info, tag("oslog_info"))
+    os_log("%{public}@", log: osLog, type: .debug, tag("oslog_debug"))
+    os_log("%{public}@", log: osLog, type: .error, tag("oslog_error"))
+    os_log("%{public}@", log: osLog, type: .fault, tag("oslog_fault"))
+
+    // --- os.Logger (subsystem com.slog.smoke, category logger) ---
+    let logger = Logger(subsystem: "com.slog.smoke", category: "logger")
+    logger.trace("\(tag("logger_trace"), privacy: .public)")
+    logger.debug("\(tag("logger_debug"), privacy: .public)")
+    logger.info("\(tag("logger_info"), privacy: .public)")
+    logger.notice("\(tag("logger_notice"), privacy: .public)")
+    logger.warning("\(tag("logger_warning"), privacy: .public)")
+    logger.error("\(tag("logger_error"), privacy: .public)")
+    logger.critical("\(tag("logger_critical"), privacy: .public)")
+    logger.fault("\(tag("logger_fault"), privacy: .public)")
+
+    // --- Privacy / redaction (interpolated values are private by default) ---
+    let secret = "SECRET-\(nonce)"
+    logger.log("\(tag("logger_private"), privacy: .public) value=\(secret)")
+    logger.log("\(tag("logger_public"), privacy: .public) value=\(secret, privacy: .public)")
+
+    // --- os_signpost (interval + event; need --signpost to surface) ---
+    let smokeSignposter = OSSignposter(subsystem: "com.slog.smoke", category: "signpost")
+    let sid = smokeSignposter.makeSignpostID()
+    let state = smokeSignposter.beginInterval("smoke.interval", id: sid, "\(tag("signpost_begin"), privacy: .public)")
+    Thread.sleep(forTimeInterval: 0.01)
+    smokeSignposter.endInterval("smoke.interval", state)
+    smokeSignposter.emitEvent("smoke.event", "\(tag("signpost_event"), privacy: .public)")
+}
+
 // MARK: - CLI
 
 let args = CommandLine.arguments
@@ -131,6 +194,9 @@ if args.contains("--help") || args.contains("-h") {
       slog-test-emitter --continuous    Emit every second until Ctrl+C
       slog-test-emitter --signpost      Emit os_signpost intervals instead of os_log messages
                                         (combine with --repeat / --continuous)
+      slog-test-emitter --smoke NONCE   Emit one tagged line per logging mechanism
+                                        (print/NSLog/os_log/Logger/signpost) for the
+                                        logging-visibility smoke test, then exit
     
     Subsystems emitted:
       com.slog.test              (categories: general, auth, performance)
@@ -139,6 +205,14 @@ if args.contains("--help") || args.contains("-h") {
     
     Log levels emitted: debug, info, default, error, fault
     """)
+    exit(0)
+}
+
+// Smoke mode: emit one tagged line per logging mechanism, then exit.
+if let idx = args.firstIndex(of: "--smoke") {
+    let nonce = (idx + 1 < args.count && !args[idx + 1].hasPrefix("--")) ? args[idx + 1] : "nononce"
+    emitSmoke(nonce: nonce)
+    print("Smoke emit complete (nonce=\(nonce))")
     exit(0)
 }
 
