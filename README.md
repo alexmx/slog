@@ -300,7 +300,7 @@ From most to least verbose:
 | `error` | 16 | Error conditions |
 | `fault` | 17 | Critical failures |
 
-When filtering by `--subsystem`, debug logs are automatically included. Override with explicit `--level`.
+Debug and info are excluded by default. Filtering by `--subsystem` auto-includes both (auto-debug); otherwise request them explicitly with `--level debug` / `--level info` (or `--debug` / `--info`). A higher floor like `--level error` shows only that level and above. Note that `debug` is live-only — visible in `stream` but not persisted for `show` unless enabled via `sudo log config --subsystem <name> --mode persist:debug`.
 
 ## MCP Server Integration
 
@@ -324,7 +324,7 @@ slog can run as an MCP server, making log querying available to AI agents for au
 
 3. Restart your MCP client
 
-Alternatively, install the [slog skill](skills/slog/SKILL.md) with [Skillman](https://github.com/alexmx/skillman) if you don't need the MCP server and prefer to use the CLI for your AI agent:
+Alternatively, install the [slog skill](skills/use-slog/SKILL.md) with [Skillman](https://github.com/alexmx/skillman) if you don't need the MCP server and prefer to use the CLI for your AI agent:
 
 ```bash
 skillman install github.com/alexmx/slog
@@ -346,7 +346,7 @@ MCP tools return JSON. For token-optimized CLI output, use `--format toon`.
 
 Responses are designed to keep agent contexts small: large result sets come back as a summary plus head/tail samples, with the full payload written as NDJSON to a spill file the agent can read selectively. `slog_show` also supports aggregate-only queries, replaying a previous spill instead of re-scanning, and tailing via a `next_since` cursor.
 
-For the full contract — every arg, every response field, agent workflow patterns — see [`skills/slog/SKILL.md`](skills/slog/SKILL.md) or the tool descriptions surfaced by the MCP server itself.
+For the full contract — every arg, every response field, agent workflow patterns — see [`skills/use-slog/SKILL.md`](skills/use-slog/SKILL.md) or the tool descriptions surfaced by the MCP server itself.
 
 ## License
 

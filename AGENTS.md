@@ -66,13 +66,13 @@ swiftformat .
 
 **Test emitter** (separate executable for e2e):
 ```bash
-swift run slog-test-emitter [--repeat N | --continuous] [--signpost]
+swift run slog-test-emitter [--repeat N | --continuous] [--signpost | --smoke <nonce>]
 ```
-`--signpost` emits `os_signpost` intervals (concurrent same-name, in-flight, event) instead of os_log messages.
+`--signpost` emits `os_signpost` intervals (concurrent same-name, in-flight, event) instead of os_log messages. `--smoke <nonce>` emits one tagged line through every Apple logging mechanism (print/NSLog/os_log/Logger/signpost) for the logging-visibility check; `scripts/logging-smoke-test.sh` drives it and prints a capture matrix of what slog/the unified log can see.
 
 ## Commands
 
-Six subcommands; `stream` is the default. See `slog --help` or `skills/slog/SKILL.md` for flags.
+Six subcommands; `stream` is the default. See `slog --help` or `skills/use-slog/SKILL.md` for flags.
 
 - **stream** — Live logs, bounded by `--timeout` / `--capture` / `--count`.
 - **show** — Historical logs from `--last` / `--start`/`--end` / archive path. Caps display with `--limit` (not `--count`).
@@ -112,8 +112,9 @@ Shared by `slog_show`, `slog_stream`, `slog_list_processes` (in `MCP/SlogResultE
 
 ## Versioning & Release
 
+- CI: `.github/workflows/ci.yml` runs `swift test` (compiles + tests) on every push/PR to `main`.
 - `.slog-version` at repo root is the source of truth. `Sources/slog/Version.swift` defaults to `"dev"`; CI generates the real value before building.
-- Release: bump `.slog-version` → push → trigger "Release" workflow in GitHub Actions → workflow tags, builds universal binary, publishes release, updates `alexmx/homebrew-tools/Formula/slog.rb` SHA256.
+- Release: bump `.slog-version` → push → trigger "Release" workflow in GitHub Actions → workflow runs tests, tags, builds universal binary, publishes release, updates `alexmx/homebrew-tools/Formula/slog.rb` SHA256.
 - Homebrew install: `brew install alexmx/tools/slog`.
 
 ## Git
