@@ -272,7 +272,7 @@ struct NDJSONSpillReadEntriesTests {
         try corrupted.write(to: target, atomically: true, encoding: .utf8)
 
         do {
-            for try await _ in NDJSONSpill.readEntries(from: target) { }
+            for try await _ in NDJSONSpill.readEntries(from: target) {}
             Issue.record("Expected parse error")
         } catch let NDJSONSpill.SpillError.parseError(_, line, _) {
             #expect(line == 2)
@@ -293,7 +293,9 @@ struct NDJSONSpillReadEntriesTests {
         try (body + "\n\n").write(to: target, atomically: true, encoding: .utf8)
 
         var count = 0
-        for try await _ in NDJSONSpill.readEntries(from: target) { count += 1 }
+        for try await _ in NDJSONSpill.readEntries(from: target) {
+            count += 1
+        }
         #expect(count == 2)
     }
 }
@@ -351,7 +353,9 @@ struct SummaryAccumulatorTests {
             entry(3, process: "A", subsystem: nil, level: .info)
         ]
         var accumulator = SummaryAccumulator()
-        for e in entries { accumulator.add(e) }
+        for e in entries {
+            accumulator.add(e)
+        }
         let streamed = accumulator.build()
         let batch = ResultSummary(entries: entries)
 
@@ -381,7 +385,7 @@ struct SummaryAccumulatorTests {
     }
 
     @Test("lastTimestamp tracks the most recently added entry — fuels next_since chaining")
-    func lastTimestampForTailing() {
+    func lastTimestampForTailing() throws {
         var accumulator = SummaryAccumulator()
         #expect(accumulator.lastTimestamp == nil)
 
@@ -393,7 +397,7 @@ struct SummaryAccumulatorTests {
         #expect(accumulator.lastTimestamp == e2.timestamp)
         // The handler computes next_since = lastTimestamp + 1µs; verify the offset
         // lands strictly after the boundary event so the next call doesn't re-pull it.
-        let nextSince = accumulator.lastTimestamp!.addingTimeInterval(0.000_001)
+        let nextSince = try #require(accumulator.lastTimestamp?.addingTimeInterval(0.000_001))
         #expect(nextSince > e2.timestamp)
     }
 }

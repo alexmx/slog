@@ -94,11 +94,10 @@ struct SummaryAccumulator {
     }
 
     func build(topN: Int = 10) -> ResultSummary {
-        let range: ResultSummary.TimeRange?
-        if let first = firstTimestamp, let last = lastTimestamp {
-            range = ResultSummary.TimeRange(start: first, end: last)
+        let range: ResultSummary.TimeRange? = if let first = firstTimestamp, let last = lastTimestamp {
+            ResultSummary.TimeRange(start: first, end: last)
         } else {
-            range = nil
+            nil
         }
         return ResultSummary(
             timeRange: range,
@@ -144,8 +143,8 @@ enum NDJSONSpill {
         var data = Data()
         data.reserveCapacity(items.count * 256)
         for item in items {
-            data.append(try encoder.encode(item))
-            data.append(0x0a)
+            try data.append(encoder.encode(item))
+            data.append(0x0A)
         }
 
         do {

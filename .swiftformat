@@ -1,4 +1,4 @@
---disable unusedArguments, wrapMultilineStatementBraces, hoistPatternLet, preferKeyPath, extensionAccessControl, modifierOrder, andOperator, initCoderUnavailable, redundantReturn
+--disable unusedArguments, wrapMultilineStatementBraces, hoistPatternLet, preferKeyPath, extensionAccessControl, modifierOrder, andOperator, initCoderUnavailable, redundantReturn, swiftTestingTestCaseNames
 --trailing-commas never
 --ranges no-space
 --max-width 120
