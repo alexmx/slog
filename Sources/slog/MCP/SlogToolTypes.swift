@@ -146,10 +146,12 @@ extension SlogTools {
         @InputProperty("Time range: duration ('5m', '1h') or 'boot'.")
         var last: String?
 
-        @InputProperty("Range start, e.g. '2024-01-15 10:30:00'. Use with `end` instead of `last`.")
+        @InputProperty(
+            "Range start, e.g. '2024-01-15 10:30:00', or ISO 8601 such as a previous `next_since` (sub-second precise). Use with `end` instead of `last`."
+        )
         var start: String?
 
-        @InputProperty("Range end. Omit to query to now.")
+        @InputProperty("Range end, same formats as `start` (ISO 8601 is sub-second precise). Omit to query to now.")
         var end: String?
 
         @InputProperty(
@@ -198,6 +200,12 @@ extension SlogTools {
 
         @InputProperty("Return only the aggregate summary (no entries, no spill). Mutex with `full`.")
         var summary_only: Bool?
+
+        @InputProperty("Read from an iOS Simulator instead of this Mac. Not with `source_file`/`archive_path`.")
+        var simulator: Bool?
+
+        @InputProperty("Simulator UDID (implies `simulator`; otherwise auto-detects when exactly one is booted).")
+        var simulator_udid: String?
     }
 
     struct StreamArgs: MCPToolInput {
@@ -234,10 +242,10 @@ extension SlogTools {
         @InputProperty("Max wait seconds (default 30). Returns whatever is captured on timeout.")
         var timeout: Int?
 
-        @InputProperty("Stream from iOS Simulator.")
+        @InputProperty("Read from an iOS Simulator instead of this Mac.")
         var simulator: Bool?
 
-        @InputProperty("Simulator UDID (auto-detects if exactly one is booted).")
+        @InputProperty("Simulator UDID (implies `simulator`; otherwise auto-detects when exactly one is booted).")
         var simulator_udid: String?
 
         @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
@@ -272,10 +280,12 @@ extension SlogTools {
         )
         var last: String?
 
-        @InputProperty("Range start, e.g. '2024-01-15 10:30:00'. Use with `end` instead of `last`.")
+        @InputProperty(
+            "Range start, e.g. '2024-01-15 10:30:00', or ISO 8601 such as a previous `next_since` (sub-second precise). Use with `end` instead of `last`."
+        )
         var start: String?
 
-        @InputProperty("Range end. Omit to query to now.")
+        @InputProperty("Range end, same formats as `start` (ISO 8601 is sub-second precise). Omit to query to now.")
         var end: String?
 
         @InputProperty("Path to a .logarchive file (alternative to `last`/`start`).")
@@ -299,6 +309,12 @@ extension SlogTools {
             "Capture live instead of querying history. Pairs begin/end as events arrive and needs no persistence — the reliable path right after exercising the app."
         )
         var live: Bool?
+
+        @InputProperty("Read from an iOS Simulator instead of this Mac (live or persisted). Not with `archive_path`.")
+        var simulator: Bool?
+
+        @InputProperty("Simulator UDID (implies `simulator`; otherwise auto-detects when exactly one is booted).")
+        var simulator_udid: String?
 
         @InputProperty("Live capture seconds (default 10, max 60). Only with `live: true`.")
         var timeout: Int?

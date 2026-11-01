@@ -44,6 +44,30 @@ struct LogProcessTests {
     }
 
     @Test
+    func keepDropsEntriesOutsideASubSecondRange() async throws {
+        let range = try #require(ShowConfiguration.TimeRange(
+            last: nil,
+            start: "2024-01-15T10:30:45.500000Z",
+            end: "2024-01-15T10:30:45.700000Z"
+        ))
+        let lines = ["45.499999", "45.600000", "45.700001"].map { seconds in
+            #"{"timestamp":"2024-01-15 10:30:\#(seconds)+0000","processID":1,"eventMessage":"at \#(seconds)"}"#
+        }
+        let stream = LogProcess.entries(
+            executable: .path(FilePath("/bin/sh")),
+            arguments: ["-c", lines.map { "echo '\($0)'" }.joined(separator: "; ")],
+            parser: LogParser(),
+            keep: { range.contains($0.timestamp) }
+        ) { ExitFailure(message: $0) }
+
+        var messages: [String] = []
+        for try await entry in stream {
+            messages.append(entry.message)
+        }
+        #expect(messages == ["at 45.600000"])
+    }
+
+    @Test
     func failureMessageIncludesStderr() async {
         let result = await run("echo 'first' >&2; echo 'Invalid device: BOGUS' >&2; exit 3")
 

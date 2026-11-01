@@ -137,7 +137,7 @@ enum NDJSONSpill {
         )
 
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = LogTimestamp.jsonEncoding
         encoder.outputFormatting = [.sortedKeys]
 
         var data = Data()
@@ -181,7 +181,7 @@ enum NDJSONSpill {
                 }
 
                 let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
+                decoder.dateDecodingStrategy = LogTimestamp.jsonDecoding
                 let lines = data.split(separator: 0x0A, omittingEmptySubsequences: false)
                 for (index, line) in lines.enumerated() {
                     if Task.isCancelled {

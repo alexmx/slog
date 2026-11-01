@@ -68,7 +68,7 @@ $ slog stream --signpost --subsystem com.myapp --category perf --capture 20s
 interval         count  p50     max     total   last args
 parse.postImage  3      42.8ms  45.1ms  128ms   len 208123
 attr.chunk       7      1.1ms   7.0ms   9.8ms   start 0
-layout.measure   12     0.41ms  0.87ms  5.2ms   height 812 → rows 12 misses 3
+layout.measure   12     410µs   870µs   5.2ms   height 812 → rows 12 misses 3
 ```
 
 ### Configuration
@@ -102,8 +102,8 @@ layout.measure   12     0.41ms  0.87ms  5.2ms   height 812 → rows 12 misses 3
 |--------|-------------|
 | `--process <name>` | Filter by process name. Comma-separated for multiple (OR-matched), e.g. `Finder,Dock` |
 | `--pid <id>` | Filter by process ID |
-| `--simulator` | Stream from iOS Simulator instead of macOS |
-| `--simulator-udid <udid>` | Specific simulator UDID (auto-detects if omitted) |
+| `--simulator` | Read from an iOS Simulator instead of macOS (`stream` and `show`) |
+| `--simulator-udid <udid>` | Specific simulator UDID; implies `--simulator` (auto-detects the one booted simulator if omitted) |
 
 ### Filter Options
 
@@ -234,6 +234,10 @@ slog stream --simulator --process MyApp
 
 # Specific simulator by UDID
 slog stream --simulator-udid XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX --process MyApp
+
+# Historical logs and persisted signposts from the simulator's own log store
+slog show --simulator --last 5m --process MyApp
+slog show --simulator --signpost --last 5m --subsystem com.myapp
 
 # Find available simulators
 slog list simulators --booted

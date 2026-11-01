@@ -139,6 +139,66 @@ struct LogParserTests {
         #expect(LogTimestamp.parse("") == nil)
     }
 
+    // MARK: - Timestamp formatting
+
+    @Test
+    func formatWritesMicrosecondsInUTC() {
+        let date = Date(timeIntervalSince1970: 1_705_314_645.123456)
+        #expect(LogTimestamp.format(date) == "2024-01-15T10:30:45.123456Z")
+    }
+
+    @Test
+    func formatPadsWholeSeconds() {
+        #expect(LogTimestamp.format(Date(timeIntervalSince1970: 1_705_314_645)) == "2024-01-15T10:30:45.000000Z")
+    }
+
+    @Test
+    func formatCarriesRoundingIntoTheNextSecond() {
+        let date = Date(timeIntervalSince1970: 1_705_314_645.9999996)
+        #expect(LogTimestamp.format(date) == "2024-01-15T10:30:46.000000Z")
+    }
+
+    @Test
+    func formatRoundTripsThroughParse() throws {
+        let date = Date(timeIntervalSince1970: 1_762_025_694.715547)
+        let parsed = try #require(LogTimestamp.parse(LogTimestamp.format(date)))
+        #expect(abs(parsed.timeIntervalSince(date)) < 0.000_001)
+    }
+
+    @Test
+    func oneMicrosecondApartFormatsDifferently() {
+        // `next_since` is the last timestamp + 1µs; it must survive encoding.
+        let date = Date(timeIntervalSince1970: 1_705_314_645.5)
+        #expect(LogTimestamp.format(date) == "2024-01-15T10:30:45.500000Z")
+        #expect(LogTimestamp.format(date.addingTimeInterval(0.000_001)) == "2024-01-15T10:30:45.500001Z")
+    }
+
+    @Test
+    func jsonStrategiesRoundTripAndAcceptWholeSeconds() throws {
+        struct Stamp: Codable { let at: Date }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = LogTimestamp.jsonEncoding
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = LogTimestamp.jsonDecoding
+
+        let date = Date(timeIntervalSince1970: 1_705_314_645.25)
+        let json = try String(decoding: encoder.encode(Stamp(at: date)), as: UTF8.self)
+        #expect(json == #"{"at":"2024-01-15T10:30:45.250000Z"}"#)
+        #expect(try decoder.decode(Stamp.self, from: Data(json.utf8)).at == date)
+
+        let legacy = try decoder.decode(Stamp.self, from: Data(#"{"at":"2024-01-15T10:30:45Z"}"#.utf8))
+        #expect(legacy.at == Date(timeIntervalSince1970: 1_705_314_645))
+    }
+
+    @Test
+    func jsonFormatterKeepsMicroseconds() {
+        let entry = LogEntry(
+            timestamp: Date(timeIntervalSince1970: 1_705_314_645.123456),
+            processName: "p", pid: 1, subsystem: nil, category: nil, level: .default, message: "m"
+        )
+        #expect(JSONFormatter().format(entry).contains(#""timestamp" : "2024-01-15T10:30:45.123456Z""#))
+    }
+
     @Test
     func parsedEntryKeepsMicroseconds() throws {
         let line = """

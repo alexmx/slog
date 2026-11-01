@@ -11,16 +11,8 @@ import System
 
 /// Configuration for log streaming
 public struct StreamConfiguration: Sendable, Equatable {
-    /// Target for log streaming
-    public enum Target: Sendable, Equatable {
-        /// Stream from the local macOS system
-        case local
-        /// Stream from an iOS Simulator with the given UDID
-        case simulator(udid: String)
-    }
-
-    /// The target to stream logs from
-    public let target: Target
+    /// The Mac or simulator to stream logs from
+    public let target: LogTarget
 
     /// Server-side predicate for filtering (passed to `log stream --predicate`)
     public let predicate: String?
@@ -39,7 +31,7 @@ public struct StreamConfiguration: Sendable, Equatable {
     public let includeSignposts: Bool
 
     public init(
-        target: Target = .local,
+        target: LogTarget = .local,
         predicate: String? = nil,
         includeInfo: Bool = true,
         includeDebug: Bool = false,
@@ -85,15 +77,7 @@ public struct LogStreamer: Sendable {
             includeSource: configuration.includeSource,
             includeSignposts: configuration.includeSignposts
         ) + LogProcess.predicateArguments(configuration.predicate)
-
-        switch configuration.target {
-        case .local:
-            return (.path(FilePath("/usr/bin/log")), args)
-
-        case .simulator(let udid):
-            let simctlArgs = ["simctl", "spawn", udid, "log"] + args
-            return (.path(FilePath("/usr/bin/xcrun")), simctlArgs)
-        }
+        return configuration.target.command(args)
     }
 }
 

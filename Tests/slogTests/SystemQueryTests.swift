@@ -116,4 +116,31 @@ struct SystemQueryTests {
             return message.contains("Sim A (A)") && message.contains("Sim B (B)")
         }
     }
+
+    // MARK: - Running tools
+
+    @Test
+    func runToolReturnsStandardOutput() async throws {
+        let data = try await SystemQuery.runTool("/bin/sh", ["-c", "echo hello"])
+        #expect(String(decoding: data, as: UTF8.self) == "hello\n")
+    }
+
+    @Test
+    func runToolFailureIncludesExitCodeAndStderr() async {
+        await #expect {
+            try await SystemQuery.runTool("/bin/sh", ["-c", "echo 'xcrun: error: no simctl' >&2; exit 3"])
+        } throws: { error in
+            (error as? SystemQueryError)?.errorDescription
+                == "`/bin/sh -c echo 'xcrun: error: no simctl' >&2; exit 3` exited with code 3: xcrun: error: no simctl"
+        }
+    }
+
+    @Test
+    func runToolReportsASignal() async {
+        await #expect {
+            try await SystemQuery.runTool("/bin/sh", ["-c", "kill -9 $$"])
+        } throws: { error in
+            (error as? SystemQueryError)?.errorDescription?.hasSuffix("was killed by signal 9") == true
+        }
+    }
 }

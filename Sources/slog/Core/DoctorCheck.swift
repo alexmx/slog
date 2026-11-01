@@ -4,6 +4,8 @@
 //
 
 import Foundation
+import Subprocess
+import System
 
 /// Result of a single system health check
 public struct DoctorCheck: Codable, Sendable {
@@ -25,7 +27,13 @@ public struct DoctorCheck: Codable, Sendable {
     }
 
     /// Run all system health checks
-    public static func runAll() -> [DoctorCheck] {
+    public static func runAll() async -> [DoctorCheck] {
+        // The command checks are independent, so run them concurrently.
+        let simctlExists = FileManager.default.isExecutableFile(atPath: "/usr/bin/xcrun")
+        async let streamCheck = succeeds("/usr/bin/log", ["stream", "--timeout", "1"])
+        async let showCheck = succeeds("/usr/bin/log", ["show", "--last", "1s", "--style", "ndjson"])
+        async let simctlCheck = simctlExists ? succeeds("/usr/bin/xcrun", ["simctl", "list", "devices", "-j"]) : false
+
         var checks: [DoctorCheck] = []
 
         let logExists = FileManager.default.isExecutableFile(atPath: "/usr/bin/log")
@@ -35,22 +43,21 @@ public struct DoctorCheck: Codable, Sendable {
             hint: logExists ? nil : "The macOS unified logging CLI is missing. It should be included with macOS."
         ))
 
-        let streamOK = checkCommand("/usr/bin/log", arguments: ["stream", "--timeout", "1"])
+        let streamOK = await streamCheck
         checks.append(DoctorCheck(
             name: "Log stream access",
             status: streamOK ? .ok : .fail,
             hint: streamOK ? nil : "Unable to stream logs. Grant Full Disk Access to your terminal app:\n  System Settings > Privacy & Security > Full Disk Access"
         ))
 
-        let showOK = checkCommand("/usr/bin/log", arguments: ["show", "--last", "1s", "--style", "ndjson"])
+        let showOK = await showCheck
         checks.append(DoctorCheck(
             name: "Log archive access (log show)",
             status: showOK ? .ok : .fail,
             hint: showOK ? nil : "Unable to query log archives. Grant Full Disk Access to your terminal app:\n  System Settings > Privacy & Security > Full Disk Access"
         ))
 
-        let simctlExists = FileManager.default.isExecutableFile(atPath: "/usr/bin/xcrun")
-        let simctlOK = simctlExists && checkCommand("/usr/bin/xcrun", arguments: ["simctl", "list", "devices", "-j"])
+        let simctlOK = await simctlCheck
         checks.append(DoctorCheck(
             name: "Simulator support (xcrun simctl)",
             status: simctlOK ? .ok : .fail,
@@ -68,16 +75,18 @@ public struct DoctorCheck: Codable, Sendable {
         return checks
     }
 
-    private static func checkCommand(_ path: String, arguments: [String]) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+    /// Whether the tool runs and exits 0, output discarded. Async (via
+    /// swift-subprocess) so a check doesn't block a thread of Swift's shared
+    /// async pool while it runs.
+    static func succeeds(_ path: String, _ arguments: [String]) async -> Bool {
         do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
+            let result = try await run(
+                .path(FilePath(path)),
+                arguments: Arguments(arguments),
+                output: .discarded,
+                error: .discarded
+            )
+            return result.terminationStatus.isSuccess
         } catch {
             return false
         }

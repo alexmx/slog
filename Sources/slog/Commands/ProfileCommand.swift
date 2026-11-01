@@ -85,13 +85,8 @@ struct CreateProfile: ParsableCommand {
     @OptionGroup(title: "Output Options")
     var output: OutputOptions
 
-    // MARK: - Stream Options
-
-    @Flag(name: .long, help: "Stream from iOS Simulator")
-    var simulator = false
-
-    @Option(name: .long, help: "Simulator UDID")
-    var simulatorUDID: String?
+    @OptionGroup(title: "Simulator Options")
+    var simulatorOptions: SimulatorOptions
 
     func run() throws {
         let profile = makeProfile()
@@ -121,8 +116,8 @@ struct CreateProfile: ParsableCommand {
             debug: output.debug,
             source: output.source,
             dedup: output.dedup,
-            simulator: simulator ? true : nil,
-            simulatorUDID: simulatorUDID
+            simulator: simulatorOptions.simulator ? true : nil,
+            simulatorUDID: simulatorOptions.simulatorUDID
         )
     }
 }

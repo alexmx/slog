@@ -17,7 +17,7 @@ public struct JSONFormatter: LogFormatter {
 
     public func format(_ entry: LogEntry) -> String {
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = LogTimestamp.jsonEncoding
         encoder.outputFormatting = pretty ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
 
         let data = (try? encoder.encode(entry)) ?? Data()

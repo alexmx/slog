@@ -9,16 +9,16 @@ import ArgumentParser
 import Foundation
 
 /// Command for checking system requirements
-struct DoctorCommand: ParsableCommand {
+struct DoctorCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "doctor",
         abstract: "Check system requirements and diagnose issues"
     )
 
-    func run() throws {
+    func run() async throws {
         print("slog doctor\n")
 
-        let checks = DoctorCheck.runAll()
+        let checks = await DoctorCheck.runAll()
 
         for check in checks {
             let label = switch check.status {

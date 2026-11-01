@@ -26,13 +26,8 @@ struct StreamCommand: AsyncParsableCommand {
     @OptionGroup(title: "Output Options")
     var output: OutputOptions
 
-    // MARK: - Target Options
-
-    @Flag(name: .long, help: "Stream from iOS Simulator instead of host")
-    var simulator = false
-
-    @Option(name: .long, help: "Simulator UDID (auto-detects if only one booted)")
-    var simulatorUDID: String?
+    @OptionGroup(title: "Simulator Options")
+    var simulatorOptions: SimulatorOptions
 
     @Flag(name: .long, help: "Report os_signpost interval durations instead of log messages")
     var signpost: Bool = false
@@ -67,21 +62,17 @@ struct StreamCommand: AsyncParsableCommand {
     // MARK: - Run
 
     func run() async throws {
-        let options = try ResolvedOptions(filter: filter, output: output, profileName: profile)
+        let options = try ResolvedOptions(
+            filter: filter,
+            output: output,
+            simulator: simulatorOptions.request,
+            profileName: profile
+        )
         let formatter = options.formatter()
         let setup = try options.filterSetup(signpost: signpost)
 
-        let target: StreamConfiguration.Target
-        if simulator || options.profile?.simulator == true {
-            let udid = try SystemQuery.resolveSimulatorUDID(simulatorUDID ?? options.profile?.simulatorUDID)
-            target = .simulator(udid: udid)
-        } else {
-            target = .local
-        }
-
-        // Create configuration
-        let config = StreamConfiguration(
-            target: target,
+        let config = try await StreamConfiguration(
+            target: options.target(),
             predicate: setup.predicate,
             includeInfo: setup.includeInfo,
             includeDebug: setup.includeDebug,

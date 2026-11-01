@@ -5,6 +5,41 @@
 
 import Foundation
 import Subprocess
+import System
+
+/// Where a `log` command runs: on this Mac, or inside an iOS Simulator.
+public enum LogTarget: Sendable, Equatable {
+    case local
+    case simulator(udid: String)
+
+    /// The executable and arguments that run `log <arguments>` on this target.
+    func command(_ arguments: [String]) -> (Executable, [String]) {
+        switch self {
+        case .local:
+            (.path(FilePath("/usr/bin/log")), arguments)
+        case .simulator(let udid):
+            (.path(FilePath("/usr/bin/xcrun")), ["simctl", "spawn", udid, "log"] + arguments)
+        }
+    }
+
+    /// What the caller asked for: the simulator flag and/or a UDID.
+    struct Request: Sendable, Equatable {
+        var simulator = false
+        var udid: String?
+
+        /// A UDID implies the simulator.
+        var isRequested: Bool {
+            simulator || udid != nil
+        }
+
+        /// `.local` unless requested; otherwise the given UDID, or the single
+        /// booted simulator (none or several throws).
+        func resolve() async throws -> LogTarget {
+            guard isRequested else { return .local }
+            return try await .simulator(udid: SystemQuery.resolveSimulatorUDID(udid))
+        }
+    }
+}
 
 /// Runs a `log` subcommand and streams its NDJSON output as parsed entries.
 /// Shared by `LogReader` (`log show`) and `LogStreamer` (`log stream`).
@@ -37,13 +72,14 @@ enum LogProcess {
         predicate.map { ["--predicate", $0] } ?? []
     }
 
-    /// Launches the process and yields each parsed line. Cancelling the stream
-    /// tears the process down; a non-zero exit finishes it with `exitError`,
-    /// whose message ends with the process's last stderr output.
+    /// Launches the process and yields each parsed line that `keep` accepts.
+    /// Cancelling the stream tears the process down; a non-zero exit finishes
+    /// it with `exitError`, whose message ends with the process's last stderr.
     static func entries(
         executable: Executable,
         arguments: [String],
         parser: LogParser,
+        keep: @escaping @Sendable (LogEntry) -> Bool = { _ in true },
         exitError: @escaping @Sendable (String) -> any Error
     ) -> AsyncThrowingStream<LogEntry, Error> {
         AsyncThrowingStream { continuation in
@@ -64,7 +100,7 @@ enum LogProcess {
                             if Task.isCancelled {
                                 break
                             }
-                            if let entry = parser.parse(line: line) {
+                            if let entry = parser.parse(line: line), keep(entry) {
                                 continuation.yield(entry)
                             }
                         }

@@ -247,7 +247,8 @@ private struct RawLogEntry: Decodable {
 /// fraction is split off, the rest is parsed at whole-second precision, and the
 /// fraction is added back as a `Double`.
 enum LogTimestamp {
-    /// Formatters are expensive to create; `date(from:)` is thread-safe.
+    /// Formatters are expensive to create; `date(from:)` and `string(from:)`
+    /// are thread-safe. UTC, whole seconds.
     private nonisolated(unsafe) static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
@@ -269,6 +270,52 @@ enum LogTimestamp {
         let date = isoFormatter.date(from: wholeSeconds)
             ?? appleFormatters.lazy.compactMap { $0.date(from: wholeSeconds) }.first
         return date?.addingTimeInterval(fraction)
+    }
+
+    /// ISO 8601 in UTC with microseconds, e.g. `2026-11-01T19:34:54.123456Z`.
+    /// Foundation's `.iso8601` JSON strategy drops the fraction entirely.
+    static func format(_ date: Date) -> String {
+        let interval = date.timeIntervalSince1970
+        var seconds = interval.rounded(.down)
+        var micros = Int(((interval - seconds) * 1_000_000).rounded())
+        if micros == 1_000_000 {
+            seconds += 1
+            micros = 0
+        }
+        let wholeSeconds = isoFormatter.string(from: Date(timeIntervalSince1970: seconds))
+        return wholeSeconds.dropLast() + String(format: ".%06dZ", micros)
+    }
+
+    /// `date` as whole seconds in UTC (`2026-11-01 22:07:07+0000`), the only
+    /// precision `log show --start/--end` accepts; rounded down or up.
+    static func wholeSecondArgument(_ date: Date, roundingUp: Bool) -> String {
+        let seconds = date.timeIntervalSince1970
+        let whole = roundingUp ? seconds.rounded(.up) : seconds.rounded(.down)
+        return logArgumentFormatter.string(from: Date(timeIntervalSince1970: whole))
+    }
+
+    private static let logArgumentFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ssZ"
+        return formatter
+    }()
+
+    /// JSON date strategies for every encoder/decoder slog uses, so timestamps
+    /// keep microseconds. Decoding also accepts whole-second values.
+    static let jsonEncoding = JSONEncoder.DateEncodingStrategy.custom { date, encoder in
+        var container = encoder.singleValueContainer()
+        try container.encode(format(date))
+    }
+
+    static let jsonDecoding = JSONDecoder.DateDecodingStrategy.custom { decoder in
+        let container = try decoder.singleValueContainer()
+        let string = try container.decode(String.self)
+        guard let date = parse(string) else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid timestamp: \(string)")
+        }
+        return date
     }
 
     /// Splits `"…:32.715547+0100"` into `("…:32+0100", 0.715547)`.

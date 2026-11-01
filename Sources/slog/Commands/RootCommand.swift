@@ -29,6 +29,7 @@ struct Slog: AsyncParsableCommand {
         iOS Simulator:
           slog stream --simulator --process MyApp
           slog stream --simulator-udid <UDID> --process MyApp
+          slog show --simulator --last 5m --process MyApp
         
         Bounded capture (for scripts/automation):
           slog stream --process MyApp --count 10

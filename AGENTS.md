@@ -22,7 +22,7 @@ slog/
 │   │   ├── LogParser.swift             # NDJSON + legacy parser
 │   │   ├── LogStreamer.swift           # `log stream` driver + PredicateBuilder
 │   │   ├── LogReader.swift             # `log show` driver
-│   │   ├── LogProcess.swift            # Shared `log` subprocess runner + common arguments
+│   │   ├── LogProcess.swift            # `log` subprocess runner, common arguments, LogTarget (Mac / simulator)
 │   │   ├── LogCapture.swift            # Bounded live capture (count/timeout/capture window), shared by CLI + MCP
 │   │   ├── SignpostAggregator.swift    # Pairs os_signpost begin/end → intervals
 │   │   ├── DurationParser.swift        # "5s", "2m" → Duration
@@ -79,6 +79,7 @@ Six subcommands; `stream` is the default. See `slog --help` or `skills/use-slog/
 
 - **stream** — Live logs, bounded by `--timeout` / `--capture` / `--count`.
 - **show** — Historical logs from `--last` / `--start`/`--end` / archive path. Caps display with `--limit` (not `--count`).
+- **stream/show `--simulator`** — Run `log` inside an iOS Simulator via `simctl spawn`; `--simulator-udid` implies it, otherwise the one booted simulator is used (none or several is an error). Not combinable with an archive path. MCP `slog_show`/`slog_stream`/`slog_signpost` take `simulator`/`simulator_udid`.
 - **stream/show `--signpost`** — Report `os_signpost` interval durations instead of log messages. Pairs begin↔end by (process, signpost name, signpost id), aggregates per name (count/p50/max/total), and prints a table (or `--format json`/`toon`). In-flight begins show null duration. Live `stream --signpost` needs no persistence; `show --signpost` reads the persisted store (custom subsystems may need `log config --mode persist:debug`).
 - **profile** — `create` / `list` / `show` / `delete` saved filter combos. Apply via `--profile <name>` on stream/show.
 - **list** — `list processes [--filter]`, `list simulators [--booted] [--all]`.

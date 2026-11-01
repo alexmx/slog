@@ -12,7 +12,7 @@ enum SlogTools {
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = LogTimestamp.jsonEncoding
         return encoder
     }()
 
@@ -73,6 +73,21 @@ enum SlogTools {
         return level
     }
 
+    /// The simulator an MCP call asks for via `simulator` / `simulator_udid`.
+    private static func simulatorRequest(_ simulator: Bool?, _ udid: String?) -> LogTarget.Request {
+        LogTarget.Request(simulator: simulator == true, udid: udid)
+    }
+
+    /// The Mac, or the requested simulator. Lookup failures (simctl missing,
+    /// no booted simulator) are system-level, so they suggest `slog_doctor`.
+    private static func target(_ request: LogTarget.Request) async throws -> LogTarget {
+        do {
+            return try await request.resolve()
+        } catch {
+            throw ToolError.system(error)
+        }
+    }
+
     /// Build a `FilterSetup` from MCP's optional array arguments.
     private static func filterSetup(
         processes: [String]?,
@@ -103,7 +118,7 @@ enum SlogTools {
         description: """
         Query historical/persisted macOS logs. Requires one source: `last`, \
         `start`/`end`, `archive_path`, or `source_file` (a previous `output_file`). \
-        Filtering by `subsystem` auto-includes debug+info.
+        Filtering by `subsystem` auto-includes debug+info. iOS Simulator via `simulator: true`.
         
         **Iterative drill-down:** pass a previous call's `output_file` back as `source_file` \
         to re-filter/re-summarize the NDJSON spill without re-scanning the OS log database. \
@@ -158,6 +173,10 @@ enum SlogTools {
                     throw ToolError(message: "Specify 'last', 'start', 'archive_path', or 'source_file'")
                 }
             }
+            let simulator = simulatorRequest(args.simulator, args.simulator_udid)
+            if simulator.isRequested, args.source_file != nil || args.archive_path != nil {
+                throw ToolError(message: "'simulator' can't be combined with 'source_file' or 'archive_path'")
+            }
 
             let setup = try filterSetup(
                 processes: args.process,
@@ -174,7 +193,8 @@ enum SlogTools {
                 // Replay a previous spill — filters/summary apply, no OS scan.
                 stream = NDJSONSpill.readEntries(from: NDJSONSpill.resolveUserPath(sourcePath))
             } else {
-                let config = ShowConfiguration(
+                let config = try await ShowConfiguration(
+                    target: target(simulator),
                     timeRange: ShowConfiguration.TimeRange(last: args.last, start: args.start, end: args.end),
                     archivePath: args.archive_path,
                     predicate: setup.predicate,
@@ -344,22 +364,8 @@ enum SlogTools {
                 excludeGrep: args.exclude_grep
             )
 
-            let target: StreamConfiguration.Target
-            if args.simulator == true {
-                do {
-                    let udid = try SystemQuery.resolveSimulatorUDID(args.simulator_udid)
-                    target = .simulator(udid: udid)
-                } catch {
-                    // simctl missing, no booted simulator, etc. — flag doctor so the
-                    // agent surfaces system state before retrying.
-                    throw ToolError.system(error)
-                }
-            } else {
-                target = .local
-            }
-
-            let config = StreamConfiguration(
-                target: target,
+            let config = try await StreamConfiguration(
+                target: target(simulatorRequest(args.simulator, args.simulator_udid)),
                 predicate: setup.predicate,
                 includeInfo: setup.includeInfo,
                 includeDebug: setup.includeDebug
@@ -433,6 +439,7 @@ enum SlogTools {
         persisted store. Custom-subsystem signposts may need `sudo log config --subsystem <name> --mode persist:debug` first.
           - **Live capture** (`live: true`): pairs intervals as events arrive over `timeout` \
         seconds (default 10). Needs no persistence — the reliable path right after driving the app.
+        Either mode reads an iOS Simulator with `simulator: true`.
         
         Pairs begin↔end by (process, signpost name, signpost id), so concurrent same-name \
         intervals stay distinct. Unmatched begins are returned as in-flight (`duration_ms: null`).
@@ -452,6 +459,11 @@ enum SlogTools {
                     message: "Specify 'last', 'start', or 'archive_path' (or set 'live: true' for live capture)"
                 )
             }
+            let simulator = simulatorRequest(args.simulator, args.simulator_udid)
+            if simulator.isRequested, args.archive_path != nil {
+                throw ToolError(message: "'simulator' can't be combined with 'archive_path'")
+            }
+            let logTarget = try await target(simulator)
 
             let setup = try filterSetup(
                 processes: args.process,
@@ -470,7 +482,7 @@ enum SlogTools {
             if live {
                 let timeoutSeconds = min(max(args.timeout ?? 10, 1), 60)
                 let config = StreamConfiguration(
-                    target: .local,
+                    target: logTarget,
                     predicate: setup.predicate,
                     includeInfo: setup.includeInfo,
                     includeDebug: setup.includeDebug,
@@ -500,6 +512,7 @@ enum SlogTools {
                 }
             } else {
                 let config = ShowConfiguration(
+                    target: logTarget,
                     timeRange: ShowConfiguration.TimeRange(last: args.last, start: args.start, end: args.end),
                     archivePath: args.archive_path,
                     predicate: setup.predicate,
@@ -572,7 +585,7 @@ enum SlogTools {
         await respond {
             let processes: [RunningProcess]
             do {
-                processes = try SystemQuery.listProcesses(filter: args.filter)
+                processes = try await SystemQuery.listProcesses(filter: args.filter)
             } catch {
                 throw ToolError.system(error)
             }
@@ -596,11 +609,11 @@ enum SlogTools {
 
     static let listSimulators = MCPTool(
         name: "slog_list_simulators",
-        description: "List iOS Simulators. Use to find UDIDs for `slog_stream` with `simulator: true`. Returns array of `{name, udid, state, runtime}`."
+        description: "List iOS Simulators. Use to find UDIDs for `simulator_udid` on `slog_show`/`slog_stream`/`slog_signpost`. Returns array of `{name, udid, state, runtime}`."
     ) { (args: ListSimulatorsArgs) in
         await respond {
             do {
-                return try SystemQuery.listSimulators(booted: args.booted ?? false, all: args.all ?? false)
+                return try await SystemQuery.listSimulators(booted: args.booted ?? false, all: args.all ?? false)
             } catch {
                 throw ToolError.system(error)
             }
@@ -611,7 +624,7 @@ enum SlogTools {
         name: "slog_doctor",
         description: "Check system requirements: log CLI, stream/archive access, simctl, profiles dir. Run if other tools fail unexpectedly."
     ) {
-        await respond { DoctorCheck.runAll() }
+        await respond { await DoctorCheck.runAll() }
     }
 
     // MARK: - All Tools

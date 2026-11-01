@@ -53,6 +53,19 @@ struct OutputOptions: ParsableArguments {
     var dedup: Bool?
 }
 
+/// Simulator options shared by `stream`, `show` and `profile create`.
+struct SimulatorOptions: ParsableArguments {
+    @Flag(name: .long, help: "Read logs from an iOS Simulator instead of this Mac")
+    var simulator = false
+
+    @Option(name: .long, help: "Simulator UDID (implies --simulator; otherwise auto-detects the one booted simulator)")
+    var simulatorUDID: String?
+
+    var request: LogTarget.Request {
+        LogTarget.Request(simulator: simulator, udid: simulatorUDID)
+    }
+}
+
 /// Command-line options merged with an optional profile: a value given on the
 /// command line wins, the profile fills the gaps, then the defaults apply.
 struct ResolvedOptions {
@@ -73,8 +86,20 @@ struct ResolvedOptions {
     let source: Bool
     let dedup: Bool
 
-    init(filter: FilterOptions, output: OutputOptions, profile: Profile?) {
+    /// The simulator asked for on the command line or in the profile.
+    let simulator: LogTarget.Request
+
+    init(
+        filter: FilterOptions,
+        output: OutputOptions,
+        simulator: LogTarget.Request = LogTarget.Request(),
+        profile: Profile?
+    ) {
         self.profile = profile
+        self.simulator = LogTarget.Request(
+            simulator: simulator.simulator || profile?.simulator == true,
+            udid: simulator.udid ?? profile?.simulatorUDID
+        )
         self.process = filter.process ?? profile?.process
         self.pid = filter.pid ?? profile?.pid
         self.subsystem = filter.subsystem ?? profile?.subsystem
@@ -91,8 +116,23 @@ struct ResolvedOptions {
     }
 
     /// Loads `profileName` (if any) and merges it under the command-line options.
-    init(filter: FilterOptions, output: OutputOptions, profileName: String?) throws {
-        try self.init(filter: filter, output: output, profile: profileName.map { try ProfileManager.load($0) })
+    init(
+        filter: FilterOptions,
+        output: OutputOptions,
+        simulator: LogTarget.Request,
+        profileName: String?
+    ) throws {
+        try self.init(
+            filter: filter,
+            output: output,
+            simulator: simulator,
+            profile: profileName.map { try ProfileManager.load($0) }
+        )
+    }
+
+    /// The Mac, or the simulator these options ask for.
+    func target() async throws -> LogTarget {
+        try await simulator.resolve()
     }
 
     /// Server-side predicate, client-side filter chain and level inclusion for these options.

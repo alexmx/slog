@@ -90,7 +90,7 @@ struct SignpostFormatterTests {
         let table = SignpostFormatter.renderTable(summaries)
 
         #expect(table.contains("height 812 → rows 12"))
-        #expect(table.contains("0.40ms"))
+        #expect(table.contains("400µs"))
     }
 
     @Test
@@ -127,8 +127,24 @@ struct SignpostFormatterTests {
     func formatMsCompactsLargeValues() {
         #expect(SignpostFormatter.formatMs(128) == "128ms")
         #expect(SignpostFormatter.formatMs(1.1) == "1.1ms")
-        #expect(SignpostFormatter.formatMs(0.437) == "0.44ms")
+        #expect(SignpostFormatter.formatMs(0.437) == "437µs")
         #expect(SignpostFormatter.formatMs(nil) == "-")
+    }
+
+    @Test
+    func formatMsShowsShortIntervalsInMicroseconds() {
+        #expect(SignpostFormatter.formatMs(0.0042) == "4.2µs")
+        #expect(SignpostFormatter.formatMs(0.0004) == "0.4µs")
+        #expect(SignpostFormatter.formatMs(0.012) == "12µs")
+        #expect(SignpostFormatter.formatMs(0) == "0.0µs")
+    }
+
+    @Test
+    func formatMsUnitBoundariesDoNotRoundIntoTheNextUnit() {
+        #expect(SignpostFormatter.formatMs(0.00996) == "10µs")
+        #expect(SignpostFormatter.formatMs(0.9996) == "1.0ms")
+        #expect(SignpostFormatter.formatMs(99.96) == "100ms")
+        #expect(SignpostFormatter.formatMs(1) == "1.0ms")
     }
 
     // MARK: - Structured formats
@@ -197,5 +213,20 @@ struct SignpostFormatterTests {
         #expect(FormattedSignpost.round(42.0000001) == 42)
         #expect(FormattedSignpost.round(1.23456) == 1.235)
         #expect(FormattedSignpost.round(nil) == nil)
+    }
+
+    @Test
+    func jsonStartKeepsMicroseconds() {
+        let start = Date(timeIntervalSince1970: 1_762_025_694.016384)
+        var agg = SignpostAggregator()
+        for (type, offset) in [(SignpostType.begin, 0.0), (.end, 0.0005)] {
+            agg.ingest(LogEntry(
+                timestamp: start.addingTimeInterval(offset), processName: "p", pid: 1,
+                subsystem: nil, category: nil, level: .default, message: "",
+                eventType: "signpostEvent", signpostID: 1, signpostName: "draw", signpostType: type
+            ))
+        }
+        let json = SignpostFormatter.render(agg.summaries(), format: .json)
+        #expect(json.contains(#""start" : "2025-11-01T19:34:54.016384Z""#))
     }
 }

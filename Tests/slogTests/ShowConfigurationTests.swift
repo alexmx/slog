@@ -46,14 +46,14 @@ struct ShowConfigurationTests {
 
     @Test
     func timeRangeFromStartOnly() {
-        #expect(ShowConfiguration.TimeRange(last: nil, start: "2024-01-15", end: nil) == .start("2024-01-15"))
+        #expect(ShowConfiguration.TimeRange(last: nil, start: "2024-01-15", end: nil) == .start(.raw("2024-01-15")))
     }
 
     @Test
     func timeRangeFromStartAndEnd() {
         #expect(
             ShowConfiguration.TimeRange(last: nil, start: "2024-01-15", end: "2024-01-16")
-                == .range(start: "2024-01-15", end: "2024-01-16")
+                == .range(start: .raw("2024-01-15"), end: .raw("2024-01-16"))
         )
     }
 
@@ -66,12 +66,12 @@ struct ShowConfigurationTests {
     @Test
     func dateRange() {
         let config = ShowConfiguration(
-            timeRange: .range(start: "2024-01-15 10:00:00", end: "2024-01-15 11:00:00")
+            timeRange: .range(start: .raw("2024-01-15 10:00:00"), end: .raw("2024-01-15 11:00:00"))
         )
 
         if case .range(let start, let end) = config.timeRange {
-            #expect(start == "2024-01-15 10:00:00")
-            #expect(end == "2024-01-15 11:00:00")
+            #expect(start == .raw("2024-01-15 10:00:00"))
+            #expect(end == .raw("2024-01-15 11:00:00"))
         } else {
             Issue.record("Expected .range time range")
         }
@@ -156,7 +156,7 @@ struct LogReaderCommandTests {
     @Test
     func startEndArgs() {
         let config = ShowConfiguration(
-            timeRange: .range(start: "2024-01-15 10:00:00", end: "2024-01-15 11:00:00")
+            timeRange: .range(start: .raw("2024-01-15 10:00:00"), end: .raw("2024-01-15 11:00:00"))
         )
         let args = reader.buildArguments(for: config)
 
@@ -199,5 +199,73 @@ struct LogReaderCommandTests {
 
         #expect(!args.contains("--info"))
         #expect(!args.contains("--debug"))
+    }
+
+    // MARK: - ISO start/end
+
+    private func value(after flag: String, in args: [String]) -> String? {
+        args.firstIndex(of: flag).map { args[$0 + 1] }
+    }
+
+    @Test
+    func isoStartIsPassedAsWholeSecondsRoundedDown() {
+        let args = reader
+            .buildArguments(for: ShowConfiguration(timeRange: .start(.init("2026-11-01T22:07:07.987654Z"))))
+        #expect(value(after: "--start", in: args) == "2026-11-01 22:07:07+0000")
+    }
+
+    @Test
+    func isoEndIsRoundedUp() {
+        let range = ShowConfiguration.TimeRange(
+            last: nil,
+            start: "2026-11-01T22:07:07.1Z",
+            end: "2026-11-01T22:08:00.2Z"
+        )
+        let args = reader.buildArguments(for: ShowConfiguration(timeRange: range))
+        #expect(value(after: "--start", in: args) == "2026-11-01 22:07:07+0000")
+        #expect(value(after: "--end", in: args) == "2026-11-01 22:08:01+0000")
+    }
+
+    @Test
+    func zonedTimestampsAreConvertedToUTC() {
+        let args = reader.buildArguments(for: ShowConfiguration(timeRange: .start(.init("2026-11-01 23:07:07+0100"))))
+        #expect(value(after: "--start", in: args) == "2026-11-01 22:07:07+0000")
+    }
+
+    @Test
+    func plainDatesPassThroughUnchanged() {
+        let range = ShowConfiguration.TimeRange(last: nil, start: "2024-01-15 10:30:00", end: "2024-01-16")
+        let args = reader.buildArguments(for: ShowConfiguration(timeRange: range))
+        #expect(value(after: "--start", in: args) == "2024-01-15 10:30:00")
+        #expect(value(after: "--end", in: args) == "2024-01-16")
+    }
+
+    @Test
+    func parseableValuesBecomeExactBounds() throws {
+        let iso = try #require(LogTimestamp.parse("2026-11-01T22:07:07.5Z"))
+        #expect(ShowConfiguration.TimeRange.Bound("2026-11-01T22:07:07.5Z") == .exact(iso))
+        #expect(ShowConfiguration.TimeRange.Bound("2024-01-15 10:30:00") == .raw("2024-01-15 10:30:00"))
+        #expect(ShowConfiguration.TimeRange.Bound("2024-01-16") == .raw("2024-01-16"))
+    }
+
+    @Test
+    func exactBoundsTrimSubSecondEdges() throws {
+        let range = try #require(ShowConfiguration.TimeRange(
+            last: nil,
+            start: "2026-11-01T22:07:07.500000Z",
+            end: "2026-11-01T22:07:08.250000Z"
+        ))
+        let start = try #require(LogTimestamp.parse("2026-11-01T22:07:07.500000Z"))
+        #expect(!range.contains(start.addingTimeInterval(-0.000_001)))
+        #expect(range.contains(start))
+        #expect(range.contains(start.addingTimeInterval(0.75)))
+        #expect(!range.contains(start.addingTimeInterval(0.750_001)))
+    }
+
+    @Test
+    func rawBoundsAndLastAreLeftToLog() {
+        let past = Date(timeIntervalSince1970: 0)
+        #expect(ShowConfiguration.TimeRange.start(.raw("2024-01-15 10:30:00")).contains(past))
+        #expect(ShowConfiguration.TimeRange.last("5m").contains(past))
     }
 }

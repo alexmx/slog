@@ -24,6 +24,9 @@ struct ShowCommand: AsyncParsableCommand {
     @OptionGroup(title: "Output Options")
     var output: OutputOptions
 
+    @OptionGroup(title: "Simulator Options")
+    var simulatorOptions: SimulatorOptions
+
     @Flag(name: .long, help: "Report os_signpost interval durations instead of log messages")
     var signpost: Bool = false
 
@@ -73,13 +76,21 @@ struct ShowCommand: AsyncParsableCommand {
     // MARK: - Run
 
     func run() async throws {
-        let options = try ResolvedOptions(filter: filter, output: output, profileName: profile)
+        let options = try ResolvedOptions(
+            filter: filter,
+            output: output,
+            simulator: simulatorOptions.request,
+            profileName: profile
+        )
+        if archivePath != nil, options.simulator.isRequested {
+            throw ValidationError("--simulator can't be combined with a .logarchive path")
+        }
         let formatter = options.formatter()
         let dedupWriter = options.dedup ? DedupWriter(formatter: formatter) : nil
         let setup = try options.filterSetup(signpost: signpost)
 
-        // Create configuration
-        let config = ShowConfiguration(
+        let config = try await ShowConfiguration(
+            target: options.target(),
             timeRange: ShowConfiguration.TimeRange(last: last, start: start, end: end),
             archivePath: archivePath,
             predicate: setup.predicate,

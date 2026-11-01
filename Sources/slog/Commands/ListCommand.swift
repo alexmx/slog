@@ -19,7 +19,7 @@ struct ListCommand: ParsableCommand {
 
 // MARK: - List Processes
 
-struct ListProcesses: ParsableCommand {
+struct ListProcesses: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "processes",
         abstract: "List running processes"
@@ -28,8 +28,8 @@ struct ListProcesses: ParsableCommand {
     @Option(name: .long, help: "Filter processes by name (case-insensitive)")
     var filter: String?
 
-    func run() throws {
-        let processes = try SystemQuery.listProcesses(filter: filter)
+    func run() async throws {
+        let processes = try await SystemQuery.listProcesses(filter: filter)
 
         print("Available processes:\n")
         for p in processes {
@@ -41,7 +41,7 @@ struct ListProcesses: ParsableCommand {
 
 // MARK: - List Simulators
 
-struct ListSimulators: ParsableCommand {
+struct ListSimulators: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "simulators",
         abstract: "List iOS Simulators"
@@ -53,8 +53,8 @@ struct ListSimulators: ParsableCommand {
     @Flag(name: .long, help: "Show all simulators (including unavailable)")
     var all = false
 
-    func run() throws {
-        let simulators = try SystemQuery.listSimulators(booted: booted, all: all)
+    func run() async throws {
+        let simulators = try await SystemQuery.listSimulators(booted: booted, all: all)
 
         print("Available simulators:\n")
 

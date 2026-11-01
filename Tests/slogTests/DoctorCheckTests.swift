@@ -23,4 +23,15 @@ struct DoctorCheckTests {
         #expect(json ==
             #"[{"name":"a","status":"ok"},{"hint":"fix it","name":"b","status":"fail"},{"name":"c","status":"info"}]"#)
     }
+
+    @Test
+    func succeedsOnlyForAZeroExit() async {
+        #expect(await DoctorCheck.succeeds("/bin/sh", ["-c", "exit 0"]))
+        #expect(await !DoctorCheck.succeeds("/bin/sh", ["-c", "exit 1"]))
+    }
+
+    @Test
+    func missingExecutableIsAFailure() async {
+        #expect(await !DoctorCheck.succeeds("/nonexistent/tool", []))
+    }
 }

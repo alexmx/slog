@@ -97,7 +97,7 @@ public enum SignpostFormatter {
     static func renderJSON(_ summaries: [SignpostSummary]) -> String {
         let models = summaries.map { FormattedSignpost(from: $0) }
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = LogTimestamp.jsonEncoding
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(models) else { return "[]" }
         return String(decoding: data, as: UTF8.self)
@@ -116,17 +116,26 @@ public enum SignpostFormatter {
 
     // MARK: - Helpers
 
-    /// Format milliseconds compactly: whole numbers above 100ms, one decimal
-    /// down to 1ms, two decimals below (so sub-ms intervals don't read as 0.0).
+    /// Format a millisecond duration compactly: `128ms`, `1.1ms`, then
+    /// microseconds below 1ms (`437µs`, `4.2µs`) so short intervals never
+    /// read as zero.
     static func formatMs(_ value: Double?) -> String {
         guard let value else { return "-" }
-        if value >= 100 {
+        // Pick the unit from the value as it will print, so a value just under a
+        // cutoff never shows as "100.0ms" or "1000µs".
+        let msAtOneDecimal = (value * 10).rounded() / 10
+        if msAtOneDecimal >= 100 {
             return String(format: "%.0fms", value)
         }
-        if value >= 1 {
+        let micros = value * 1000
+        if micros.rounded() >= 1000 {
             return String(format: "%.1fms", value)
         }
-        return String(format: "%.2fms", value)
+        let microsAtOneDecimal = (micros * 10).rounded() / 10
+        if microsAtOneDecimal >= 10 {
+            return String(format: "%.0fµs", micros)
+        }
+        return String(format: "%.1fµs", micros)
     }
 
     /// The most recent occurrence's begin and end args, joined as
