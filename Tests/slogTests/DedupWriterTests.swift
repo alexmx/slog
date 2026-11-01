@@ -5,6 +5,7 @@
 
 import Foundation
 @testable import slog
+import Synchronization
 import Testing
 
 /// Test formatter that returns just the message
@@ -73,5 +74,60 @@ struct DedupWriterTests {
     func emptyFlush() {
         let writer = DedupWriter(formatter: MessageOnlyFormatter())
         writer.flush()
+    }
+
+    // MARK: - Output
+
+    /// Collects written lines so tests can check the deduplicated output.
+    private final class Lines: Sendable {
+        private let storage = Mutex<[String]>([])
+        var all: [String] {
+            storage.withLock { $0 }
+        }
+
+        func append(_ line: String) {
+            storage.withLock { $0.append(line) }
+        }
+    }
+
+    private func written(_ messages: [String]) -> [String] {
+        let lines = Lines()
+        let writer = DedupWriter(formatter: MessageOnlyFormatter()) { lines.append($0) }
+        for message in messages {
+            writer.write(makeEntry(message: message))
+        }
+        writer.flush()
+        return lines.all
+    }
+
+    @Test
+    func repeatsCollapseIntoACount() {
+        #expect(written(["a", "a", "a", "b", "a"]) == ["a (x3)", "b", "a"])
+    }
+
+    @Test
+    func uniqueMessagesPassThrough() {
+        #expect(written(["a", "b", "c"]) == ["a", "b", "c"])
+    }
+
+    @Test
+    func nothingIsWrittenUntilARunEnds() {
+        let lines = Lines()
+        let writer = DedupWriter(formatter: MessageOnlyFormatter()) { lines.append($0) }
+        writer.write(makeEntry(message: "a"))
+        writer.write(makeEntry(message: "a"))
+        #expect(lines.all.isEmpty)
+        writer.flush()
+        #expect(lines.all == ["a (x2)"])
+    }
+
+    @Test
+    func flushTwiceWritesOnce() {
+        let lines = Lines()
+        let writer = DedupWriter(formatter: MessageOnlyFormatter()) { lines.append($0) }
+        writer.write(makeEntry(message: "a"))
+        writer.flush()
+        writer.flush()
+        #expect(lines.all == ["a"])
     }
 }

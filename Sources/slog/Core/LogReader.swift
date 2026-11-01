@@ -11,14 +11,24 @@ import System
 public struct ShowConfiguration: Sendable, Equatable {
     /// Time range for the log query
     public enum TimeRange: Sendable, Equatable {
-        /// Show logs from the last N seconds/minutes/hours (e.g., "5m", "1h")
+        /// Show logs from the last duration (e.g., "5m", "1h") or `boot`
         case last(String)
-        /// Show logs from the last boot
-        case lastBoot
         /// Show logs starting from a specific date
         case start(String)
         /// Show logs in a date range
         case range(start: String, end: String)
+
+        /// Builds a range from `last` / `start` / `end` inputs, or `nil` when
+        /// neither `last` nor `start` is given. `boot` is matched case-insensitively.
+        public init?(last: String?, start: String?, end: String?) {
+            if let last {
+                self = .last(last.lowercased() == "boot" ? "boot" : last)
+            } else if let start {
+                self = end.map { .range(start: start, end: $0) } ?? .start(start)
+            } else {
+                return nil
+            }
+        }
     }
 
     /// The time range to query
@@ -74,60 +84,25 @@ public struct LogReader: Sendable {
     public func read(
         configuration: ShowConfiguration
     ) -> AsyncThrowingStream<LogEntry, Error> {
-        let parser = parser
-        let arguments = buildArguments(for: configuration)
-
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let result = try await run(
-                        .path(FilePath("/usr/bin/log")),
-                        arguments: Arguments(arguments)
-                    ) { _, stdout in
-                        for try await line in stdout.lines() {
-                            if Task.isCancelled { break }
-                            if let entry = parser.parse(line: line) {
-                                continuation.yield(entry)
-                            }
-                        }
-                    }
-
-                    if case .exited(let code) = result.terminationStatus, code != 0 {
-                        continuation.finish(throwing: ShowError.logShowError("Process exited with code \(code)"))
-                    } else {
-                        continuation.finish()
-                    }
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-
-            continuation.onTermination = { _ in
-                task.cancel()
-            }
+        LogProcess.entries(
+            executable: .path(FilePath("/usr/bin/log")),
+            arguments: buildArguments(for: configuration),
+            parser: parser
+        ) {
+            ShowError.logShowError($0)
         }
     }
 
     // MARK: - Private
 
     func buildArguments(for configuration: ShowConfiguration) -> [String] {
-        var args = ["show", "--style", "ndjson"]
-
-        if configuration.includeInfo {
-            args.append("--info")
-        }
-
-        if configuration.includeDebug {
-            args.append("--debug")
-        }
-
-        if configuration.includeSource {
-            args.append("--source")
-        }
-
-        if configuration.includeSignposts {
-            args.append("--signpost")
-        }
+        var args = LogProcess.arguments(
+            "show",
+            includeInfo: configuration.includeInfo,
+            includeDebug: configuration.includeDebug,
+            includeSource: configuration.includeSource,
+            includeSignposts: configuration.includeSignposts
+        )
 
         // Time range arguments
         if let timeRange = configuration.timeRange {
@@ -135,9 +110,6 @@ public struct LogReader: Sendable {
             case .last(let duration):
                 args.append("--last")
                 args.append(duration)
-            case .lastBoot:
-                args.append("--last")
-                args.append("boot")
             case .start(let date):
                 args.append("--start")
                 args.append(date)
@@ -149,10 +121,7 @@ public struct LogReader: Sendable {
             }
         }
 
-        if let predicate = configuration.predicate {
-            args.append("--predicate")
-            args.append(predicate)
-        }
+        args += LogProcess.predicateArguments(configuration.predicate)
 
         // Archive path goes last as a positional argument
         if let archivePath = configuration.archivePath {
@@ -167,14 +136,11 @@ public struct LogReader: Sendable {
 
 public enum ShowError: Error, LocalizedError {
     case logShowError(String)
-    case invalidTimeRange(String)
 
     public var errorDescription: String? {
         switch self {
         case .logShowError(let message):
             "Log show error: \(message)"
-        case .invalidTimeRange(let message):
-            "Invalid time range: \(message)"
         }
     }
 }

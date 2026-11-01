@@ -10,41 +10,31 @@ import Rainbow
 
 /// Colored output formatter using ANSI colors
 public struct ColorFormatter: LogFormatter {
-    private let showTimestamp: Bool
-    private let showLevel: Bool
     private let showProcess: Bool
     private let showSubsystem: Bool
-    private let highlightPattern: String?
+    /// Compiled once; nil when there is no pattern or it does not compile.
+    private let highlightRegex: NSRegularExpression?
     private let timestampFormatter: TimestampFormatter
 
     public init(
-        showTimestamp: Bool = true,
-        showLevel: Bool = true,
         showProcess: Bool = true,
         showSubsystem: Bool = true,
         highlightPattern: String? = nil,
         timestampFormatter: TimestampFormatter = TimestampFormatter()
     ) {
-        self.showTimestamp = showTimestamp
-        self.showLevel = showLevel
         self.showProcess = showProcess
         self.showSubsystem = showSubsystem
-        self.highlightPattern = highlightPattern
+        self.highlightRegex = highlightPattern.flatMap {
+            try? NSRegularExpression(pattern: $0, options: [.caseInsensitive])
+        }
         self.timestampFormatter = timestampFormatter
     }
 
     public func format(_ entry: LogEntry) -> String {
-        var components: [String] = []
-
-        if showTimestamp {
-            let timestamp = timestampFormatter.format(entry.timestamp)
-            components.append(timestamp.lightBlack)
-        }
-
-        if showLevel {
-            let levelStr = coloredLevel(entry.level)
-            components.append(levelStr)
-        }
+        var components = [
+            timestampFormatter.format(entry.timestamp).lightBlack,
+            coloredLevel(entry.level)
+        ]
 
         if showProcess {
             let processStr = "\(entry.processName)[\(entry.pid)]"
@@ -63,9 +53,8 @@ public struct ColorFormatter: LogFormatter {
         var message = entry.message
 
         // Highlight pattern matches if specified
-        if let pattern = highlightPattern,
-           let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
-            message = highlightMatches(in: message, regex: regex)
+        if let highlightRegex {
+            message = highlightMatches(in: message, regex: highlightRegex)
         }
 
         // Color message based on level

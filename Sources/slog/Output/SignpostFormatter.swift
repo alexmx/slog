@@ -116,19 +116,25 @@ public enum SignpostFormatter {
 
     // MARK: - Helpers
 
-    /// Format milliseconds compactly: whole numbers above 100ms, one decimal below.
+    /// Format milliseconds compactly: whole numbers above 100ms, one decimal
+    /// down to 1ms, two decimals below (so sub-ms intervals don't read as 0.0).
     static func formatMs(_ value: Double?) -> String {
         guard let value else { return "-" }
         if value >= 100 {
             return String(format: "%.0fms", value)
         }
-        return String(format: "%.1fms", value)
+        if value >= 1 {
+            return String(format: "%.1fms", value)
+        }
+        return String(format: "%.2fms", value)
     }
 
-    /// The most recent occurrence's interpolated args (empty rendered as "-").
+    /// The most recent occurrence's begin and end args, joined as
+    /// "begin → end" (empty rendered as "-").
     private static func lastArgs(_ summary: SignpostSummary) -> String {
-        let message = summary.occurrences.last?.message ?? ""
-        return message.isEmpty ? "-" : message
+        guard let last = summary.occurrences.last else { return "-" }
+        let parts = [last.message, last.endMessage ?? ""].filter { !$0.isEmpty }
+        return parts.isEmpty ? "-" : parts.joined(separator: " → ")
     }
 }
 

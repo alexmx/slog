@@ -60,16 +60,20 @@ public struct FormattedSignpostOccurrence: Encodable, Sendable {
     public let start: Date
     public let durationMs: Double?
     public let message: String
+    /// Omitted when the end event carried no message.
+    public let endMessage: String?
 
     enum CodingKeys: String, CodingKey {
         case start
         case durationMs = "duration_ms"
         case message
+        case endMessage = "end_message"
     }
 
     public init(_ interval: SignpostInterval) {
         self.start = interval.start
         self.durationMs = FormattedSignpost.round(interval.durationMs)
         self.message = interval.message
+        self.endMessage = interval.endMessage
     }
 }

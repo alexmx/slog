@@ -10,6 +10,7 @@ slog/
 ├── Sources/slog/
 │   ├── Commands/                       # One file per CLI command (ArgumentParser)
 │   │   ├── RootCommand.swift           # @main, 6 subcommands
+│   │   ├── SharedOptions.swift         # Filter/output option groups + profile merge (ResolvedOptions)
 │   │   ├── StreamCommand.swift         # Live streaming
 │   │   ├── ShowCommand.swift           # Historical queries
 │   │   ├── ProfileCommand.swift        # Profile CRUD
@@ -21,6 +22,8 @@ slog/
 │   │   ├── LogParser.swift             # NDJSON + legacy parser
 │   │   ├── LogStreamer.swift           # `log stream` driver + PredicateBuilder
 │   │   ├── LogReader.swift             # `log show` driver
+│   │   ├── LogProcess.swift            # Shared `log` subprocess runner + common arguments
+│   │   ├── LogCapture.swift            # Bounded live capture (count/timeout/capture window), shared by CLI + MCP
 │   │   ├── SignpostAggregator.swift    # Pairs os_signpost begin/end → intervals
 │   │   ├── DurationParser.swift        # "5s", "2m" → Duration
 │   │   ├── SystemQuery.swift           # Processes / simulators / UDID
@@ -31,15 +34,15 @@ slog/
 │   │   ├── Profile.swift               # Profile model
 │   │   └── ProfileManager.swift        # Profile CRUD
 │   ├── Filters/
-│   │   ├── FilterChain.swift           # Thread-safe filter chain
+│   │   ├── FilterChain.swift           # Composable filter chain
 │   │   ├── FilterSetup.swift           # Predicate + chain + auto-debug builder
 │   │   └── Predicates.swift            # Composable predicate types
 │   ├── MCP/
 │   │   ├── SlogTools.swift             # 6 MCP tool definitions
+│   │   ├── SlogToolTypes.swift         # Tool argument + response types
 │   │   └── SlogResultEnvelope.swift    # ResultSummary, NDJSONSpill, envelope builders
 │   └── Output/                         # Formatters
 │       ├── Formatter.swift             # Protocol, registry, OutputFormat
-│       ├── FormattedEntry.swift        # Shared Encodable model (JSON/TOON)
 │       ├── FormattedSignpost.swift     # Shared Encodable model for signpost output
 │       ├── SignpostFormatter.swift     # Signpost table / JSON / TOON renderer
 │       ├── PlainFormatter.swift

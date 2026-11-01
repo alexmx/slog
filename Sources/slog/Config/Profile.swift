@@ -108,4 +108,24 @@ public struct Profile: Codable, Equatable, Sendable {
     public var resolvedTimeMode: TimeMode? {
         time.flatMap { TimeMode(rawValue: $0) }
     }
+
+    /// Describes the first `level`, `format` or `time` value slog doesn't
+    /// recognize, or `nil` when every set field is valid. Lets a hand-edited
+    /// profile fail loudly instead of silently losing the field.
+    public var unrecognizedValue: String? {
+        if let level, resolvedLevel == nil {
+            return Self.describe(field: "level", value: level, expected: LogLevel.allValueStrings)
+        }
+        if let format, resolvedFormat == nil {
+            return Self.describe(field: "format", value: format, expected: OutputFormat.allCases.map(\.rawValue))
+        }
+        if let time, resolvedTimeMode == nil {
+            return Self.describe(field: "time", value: time, expected: TimeMode.allCases.map(\.rawValue))
+        }
+        return nil
+    }
+
+    private static func describe(field: String, value: String, expected: [String]) -> String {
+        "unknown \(field) '\(value)' (expected one of: \(expected.joined(separator: ", ")))"
+    }
 }

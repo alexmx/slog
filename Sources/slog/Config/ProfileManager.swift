@@ -16,11 +16,16 @@ enum ProfileManager {
 
         let data = try Data(contentsOf: url)
 
+        let profile: Profile
         do {
-            return try JSONDecoder().decode(Profile.self, from: data)
+            profile = try JSONDecoder().decode(Profile.self, from: data)
         } catch {
             throw ProfileError.invalidProfile("\(name): \(error.localizedDescription)")
         }
+        if let problem = profile.unrecognizedValue {
+            throw ProfileError.invalidProfile("\(name): \(problem)")
+        }
+        return profile
     }
 
     /// Save a profile by name (creates directories lazily)
@@ -66,11 +71,6 @@ enum ProfileManager {
             .filter { $0.pathExtension == "json" }
             .map { $0.deletingPathExtension().lastPathComponent }
             .sorted()
-    }
-
-    /// Check if a profile exists
-    static func exists(_ name: String) -> Bool {
-        FileManager.default.fileExists(atPath: profileURL(name).path)
     }
 
     /// Get the file URL for a profile name

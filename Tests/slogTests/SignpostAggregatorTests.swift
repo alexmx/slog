@@ -95,6 +95,28 @@ struct SignpostAggregatorTests {
         #expect(agg.orphanEndCount == 1)
     }
 
+    @Test
+    func endMessageIsKept() throws {
+        var agg = SignpostAggregator()
+        agg.ingest(entry(name: "render.draw", id: 1, type: .begin, offset: 0, message: "height 812"))
+        agg.ingest(entry(name: "render.draw", id: 1, type: .end, offset: 0.0004, message: "rows 12 misses 3"))
+
+        let interval = try #require(agg.intervals().first)
+        #expect(interval.message == "height 812")
+        #expect(interval.endMessage == "rows 12 misses 3")
+        // Sub-millisecond duration survives.
+        #expect(abs((interval.durationMs ?? 0) - 0.4) < 0.0001)
+    }
+
+    @Test
+    func emptyEndMessageIsNil() throws {
+        var agg = SignpostAggregator()
+        agg.ingest(entry(name: "op", id: 1, type: .begin, offset: 0, message: "x"))
+        agg.ingest(entry(name: "op", id: 1, type: .end, offset: 0.001))
+
+        #expect(try #require(agg.intervals().first).endMessage == nil)
+    }
+
     // MARK: - Unmatched events
 
     @Test

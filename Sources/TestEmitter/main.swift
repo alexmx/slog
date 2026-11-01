@@ -74,10 +74,11 @@ func emitTestLogs(batch: Int) {
 // (subsystem, category, name, signpostID); the consumer pairs begin->end by ID
 // and computes duration = end.ts - begin.ts.
 //
-// Covers the three cases a pairing implementation must handle:
+// Covers the cases a pairing implementation must handle:
 //   1. Simple sequential interval with interpolated args.
 //   2. Two CONCURRENT same-name intervals with distinct IDs (must NOT collapse).
 //   3. An in-flight begin with no matching end (duration should be null).
+//   4. A sub-millisecond interval whose end event carries its own args.
 // Plus a standalone signpost event (not an interval).
 
 func emitSignposts(batch: Int) {
@@ -110,6 +111,11 @@ func emitSignposts(batch: Int) {
     // 3. In-flight begin: intentionally never ended (state dropped).
     let id3 = signposter.makeSignpostID()
     _ = signposter.beginInterval("render.draw", id: id3, "frame \(1, privacy: .public)\(suffix, privacy: .public)")
+
+    // 4. Sub-ms interval with results attached at the end.
+    let id4 = signposter.makeSignpostID()
+    let s4 = signposter.beginInterval("layout.measure", id: id4, "height \(812, privacy: .public)")
+    signposter.endInterval("layout.measure", s4, "rows \(12, privacy: .public) misses \(3, privacy: .public)")
 
     // Standalone signpost event (not an interval).
     signposter.emitEvent("checkpoint", "phase init\(suffix, privacy: .public)")
@@ -249,10 +255,14 @@ if continuous {
         emitSignposts(batch: repeatCount > 1 ? i + 1 : 0)
         if repeatCount > 1 {
             print("  Batch \(i + 1) emitted")
-            if i < repeatCount - 1 { Thread.sleep(forTimeInterval: 1.0) }
+            if i < repeatCount - 1 {
+                Thread.sleep(forTimeInterval: 1.0)
+            }
         }
     }
-    print("Emitted signpost intervals (parse.postImage, attr.chunk x2 concurrent, render.draw in-flight) + 1 event")
+    print(
+        "Emitted signpost intervals (parse.postImage, attr.chunk x2 concurrent, render.draw in-flight, layout.measure) + 1 event"
+    )
     print("")
     print("Capture intervals with the OS log CLI (signposts are skipped without --signpost):")
     print("  log show --last 30s --signpost --style ndjson --predicate 'subsystem == \"com.slog.test\"'")

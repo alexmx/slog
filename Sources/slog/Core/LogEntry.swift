@@ -175,6 +175,62 @@ public struct LogEntry: Codable, Sendable, Equatable {
         self.signpostType = signpostType
         self.signpostScope = signpostScope
     }
+
+    /// One JSON shape for every output: CLI `--format json`/`toon`, MCP
+    /// entries and NDJSON spills (which decode back through `init(from:)`).
+    enum CodingKeys: String, CodingKey {
+        case timestamp
+        case processName = "process"
+        case pid
+        case level
+        case message
+        case subsystem
+        case category
+        case threadID
+        case activityID
+        case processImagePath
+        case senderImagePath
+        case traceID
+        case eventType
+        case source
+        case signpostID
+        case signpostName
+        case signpostType
+        case signpostScope
+    }
+
+    /// Encodes the core fields in display order, and signpost fields only when
+    /// present — TOON writes absent optionals as `null`, which would add four
+    /// empty lines to every non-signpost entry.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(processName, forKey: .processName)
+        try container.encode(pid, forKey: .pid)
+        try container.encode(level, forKey: .level)
+        try container.encode(message, forKey: .message)
+        try container.encodeIfPresent(subsystem, forKey: .subsystem)
+        try container.encodeIfPresent(category, forKey: .category)
+        try container.encodeIfPresent(threadID, forKey: .threadID)
+        try container.encodeIfPresent(activityID, forKey: .activityID)
+        try container.encodeIfPresent(processImagePath, forKey: .processImagePath)
+        try container.encodeIfPresent(senderImagePath, forKey: .senderImagePath)
+        try container.encodeIfPresent(traceID, forKey: .traceID)
+        try container.encodeIfPresent(eventType, forKey: .eventType)
+        try container.encodeIfPresent(source, forKey: .source)
+        if let signpostID {
+            try container.encode(signpostID, forKey: .signpostID)
+        }
+        if let signpostName {
+            try container.encode(signpostName, forKey: .signpostName)
+        }
+        if let signpostType {
+            try container.encode(signpostType, forKey: .signpostType)
+        }
+        if let signpostScope {
+            try container.encode(signpostScope, forKey: .signpostScope)
+        }
+    }
 }
 
 extension LogEntry: CustomStringConvertible {

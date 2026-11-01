@@ -73,7 +73,9 @@ struct ListSimulators: ParsableCommand {
         var currentRuntime = ""
         for sim in simulators {
             if sim.runtime != currentRuntime {
-                if !currentRuntime.isEmpty { print("") }
+                if !currentRuntime.isEmpty {
+                    print("")
+                }
                 currentRuntime = sim.runtime
                 print("  \(sim.runtime):")
             }

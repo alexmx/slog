@@ -7,6 +7,7 @@
 
 import ArgumentParser
 import Foundation
+import Synchronization
 
 /// Timestamp display mode
 public enum TimeMode: String, CaseIterable, Sendable, ExpressibleByArgument {
@@ -14,11 +15,12 @@ public enum TimeMode: String, CaseIterable, Sendable, ExpressibleByArgument {
     case relative
 }
 
-/// Thread-safe timestamp formatter that tracks state for relative mode
-public final class TimestampFormatter: @unchecked Sendable {
+/// Formats timestamps. In relative mode each call shows the gap since the
+/// previous call, so one instance should format one stream in order.
+public final class TimestampFormatter: Sendable {
     private let mode: TimeMode
-    private var previousTimestamp: Date?
     private let dateFormatter: DateFormatter
+    private let previousTimestamp = Mutex<Date?>(nil)
 
     public init(mode: TimeMode = .absolute) {
         self.mode = mode
@@ -31,12 +33,14 @@ public final class TimestampFormatter: @unchecked Sendable {
         case .absolute:
             return dateFormatter.string(from: timestamp)
         case .relative:
-            defer { previousTimestamp = timestamp }
-            guard let prev = previousTimestamp else {
+            let previous = previousTimestamp.withLock { previous in
+                defer { previous = timestamp }
+                return previous
+            }
+            guard let previous else {
                 return "+0.000s"
             }
-            let delta = timestamp.timeIntervalSince(prev)
-            return formatDelta(delta)
+            return formatDelta(timestamp.timeIntervalSince(previous))
         }
     }
 

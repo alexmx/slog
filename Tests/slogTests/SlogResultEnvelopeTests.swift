@@ -242,6 +242,51 @@ struct NDJSONSpillReadEntriesTests {
         #expect(roundTripped == original)
     }
 
+    /// The MCP server reads stdin through FileHandle async bytes, which keeps
+    /// Foundation's shared async-bytes queue busy while it waits for input.
+    /// Replaying a spill must not queue behind that read.
+    @Test("readEntries isn't blocked by a pending FileHandle async read")
+    func notBlockedByPendingAsyncBytesRead() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("slog-test-\(UUID().uuidString)")
+        let target = tmpDir.appendingPathComponent("spill.ndjson")
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+        try NDJSONSpill.write(items: (0..<3).map { entry($0) }, to: target)
+
+        // Stand-in for the server's stdin reader: a read that never gets data.
+        let idle = Pipe()
+        let blocker = Task {
+            for try await _ in idle.fileHandleForReading.bytes {}
+        }
+        defer {
+            try? idle.fileHandleForWriting.close()
+            blocker.cancel()
+        }
+
+        let count: Int? = await withTaskGroup(of: Int?.self) { group in
+            group.addTask {
+                var count = 0
+                do {
+                    for try await _ in NDJSONSpill.readEntries(from: target) {
+                        count += 1
+                    }
+                } catch {
+                    return -1
+                }
+                return count
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(5))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+
+        #expect(count == 3, "readEntries didn't finish within 5s")
+    }
+
     @Test("readEntries surfaces missing-file as SpillError.readFailed")
     func missingFile() async throws {
         let missing = FileManager.default.temporaryDirectory

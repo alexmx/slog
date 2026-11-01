@@ -79,48 +79,11 @@ struct CreateProfile: ParsableCommand {
     @Flag(name: .long, help: "Overwrite existing profile")
     var force = false
 
-    // MARK: - Filter Options
+    @OptionGroup(title: "Filter Options")
+    var filter: FilterOptions
 
-    @Option(name: .long, help: "Filter by process name")
-    var process: String?
-
-    @Option(name: .long, help: "Filter by process ID")
-    var pid: Int?
-
-    @Option(name: .long, help: "Filter by subsystem")
-    var subsystem: String?
-
-    @Option(name: .long, help: "Filter by category")
-    var category: String?
-
-    @Option(name: .long, help: "Minimum log level (debug, info, default, error, fault)")
-    var level: LogLevel?
-
-    @Option(name: .long, help: "Filter messages by regex pattern")
-    var grep: String?
-
-    @Option(name: .long, help: "Exclude messages matching regex pattern")
-    var excludeGrep: String?
-
-    // MARK: - Output Options
-
-    @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
-    var format: OutputFormat?
-
-    @Option(name: .long, help: "Timestamp mode (absolute, relative)")
-    var time: TimeMode?
-
-    @Flag(name: .long, help: "Include info-level messages")
-    var info = false
-
-    @Flag(name: .long, help: "Include debug-level messages")
-    var debug = false
-
-    @Flag(name: .long, help: "Include source location info")
-    var source = false
-
-    @Flag(name: .long, help: "Collapse consecutive identical messages")
-    var dedup = false
+    @OptionGroup(title: "Output Options")
+    var output: OutputOptions
 
     // MARK: - Stream Options
 
@@ -131,23 +94,7 @@ struct CreateProfile: ParsableCommand {
     var simulatorUDID: String?
 
     func run() throws {
-        let profile = Profile(
-            process: process,
-            pid: pid,
-            subsystem: subsystem,
-            category: category,
-            level: level?.rawValue.lowercased(),
-            grep: grep,
-            excludeGrep: excludeGrep,
-            format: format?.rawValue,
-            time: time?.rawValue,
-            info: info ? true : nil,
-            debug: debug ? true : nil,
-            source: source ? true : nil,
-            dedup: dedup ? true : nil,
-            simulator: simulator ? true : nil,
-            simulatorUDID: simulatorUDID
-        )
+        let profile = makeProfile()
 
         guard !profile.isEmpty else {
             throw ValidationError("No options specified. Provide at least one filter or format option.")
@@ -155,6 +102,28 @@ struct CreateProfile: ParsableCommand {
 
         try ProfileManager.save(name, profile: profile, force: force)
         print("Profile '\(name)' saved to \(ProfileManager.profileURL(name).path)")
+    }
+
+    /// The profile these options describe. Unset options stay `nil`, so loading
+    /// the profile only overrides what was given here.
+    func makeProfile() -> Profile {
+        Profile(
+            process: filter.process,
+            pid: filter.pid,
+            subsystem: filter.subsystem,
+            category: filter.category,
+            level: filter.level?.rawValue.lowercased(),
+            grep: filter.grep,
+            excludeGrep: filter.excludeGrep,
+            format: output.format?.rawValue,
+            time: output.time?.rawValue,
+            info: output.info,
+            debug: output.debug,
+            source: output.source,
+            dedup: output.dedup,
+            simulator: simulator ? true : nil,
+            simulatorUDID: simulatorUDID
+        )
     }
 }
 

@@ -17,71 +17,7 @@ struct Slog: AsyncParsableCommand {
         slog wraps Apple's `log` CLI to provide enhanced filtering, \
         formatting, and iOS Simulator support.
         
-        ━━━ STREAM COMMAND ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        Stream logs from macOS or iOS Simulator (default command).
-        
-        Target Options:
-          --process <name>        Filter by process name
-          --pid <id>              Filter by process ID
-          --simulator             Stream from iOS Simulator instead of host
-          --simulator-udid <udid> Simulator UDID (auto-detects if one booted)
-        
-        Filter Options:
-          --subsystem <name>      Filter by subsystem (e.g., com.apple.network)
-          --category <name>       Filter by category
-          --level <level>         Minimum log level: debug, info, default, error, fault
-          --grep <pattern>        Filter messages by regex pattern
-        
-        Output Options:
-          --format <fmt>          Output format: plain, compact, color (default), json, toon
-          --info                  Include info-level messages
-          --debug                 Include debug-level messages
-        
-        Timing Options (for bounded capture):
-          --timeout <duration>    Max wait for first log (exits with code 1 if exceeded)
-          --capture <duration>    Capture duration after first log arrives
-          --count <n>             Number of entries to capture
-        
-          Duration format: 5s, 30s, 2m, 1h (seconds assumed if no suffix)
-        
-        ━━━ SHOW COMMAND ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        Query historical/persisted logs from the macOS log archive.
-        
-        Time Range Options:
-          --last <duration|boot>  Show logs from last duration (e.g., 5m, 1h) or boot
-          --start <date>          Start date (e.g., "2024-01-15 10:30:00")
-          --end <date>            End date (e.g., "2024-01-15 11:00:00")
-        
-        Filter Options:
-          --process <name>        Filter by process name
-          --pid <id>              Filter by process ID
-          --subsystem <name>      Filter by subsystem
-          --category <name>       Filter by category
-          --level <level>         Minimum log level: debug, info, default, error, fault
-          --grep <pattern>        Filter messages by regex pattern
-        
-        Output Options:
-          --format <fmt>          Output format: plain, compact, color (default), json, toon
-          --info                  Include info-level messages
-          --debug                 Include debug-level messages
-          --limit <n>             Maximum number of entries to display
-        
-        Archive:
-          [archive-path]          Optional path to a .logarchive file
-        
-        ━━━ LIST COMMAND ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        List available processes or simulators.
-        
-        Subcommands:
-          list processes          List running processes
-            --filter <name>       Filter by name (case-insensitive)
-        
-          list simulators         List iOS Simulators
-            --booted              Show only booted simulators
-            --all                 Include unavailable simulators
+        Run `slog <command> --help` for each command's options.
         
         ━━━ EXAMPLES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         

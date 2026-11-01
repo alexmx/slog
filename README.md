@@ -61,13 +61,14 @@ slog stream --process MyApp --count 10
 | `stream` | Stream live logs (default command) | `--process` `--subsystem` `--level` `--grep` `--format` `--count` `--signpost` | `slog stream --process MyApp --level error` |
 | `show` | Query historical logs | `--last` `--start`/`--end` `--process` `--format` `--limit` `--signpost` | `slog show --last 5m --format json` |
 
-**Signpost mode** (`--signpost` on `stream`/`show`): report `os_signpost` interval durations instead of log messages. Pairs begin↔end by (process, signpost name, signpost id) so concurrent same-name intervals stay distinct, and aggregates per name. Live `stream --signpost` needs no persistence; `show --signpost` reads the persisted store. Works with `--format json`/`toon`.
+**Signpost mode** (`--signpost` on `stream`/`show`): report `os_signpost` interval durations instead of log messages. Pairs begin↔end by (process, signpost name, signpost id) so concurrent same-name intervals stay distinct, and aggregates per name. Durations keep microsecond precision, and args attached at either end (`beginInterval` / `endInterval`) are kept — `last args` shows them as `begin → end`; JSON/TOON occurrences carry `message` and `end_message`. Live `stream --signpost` needs no persistence; `show --signpost` reads the persisted store. Works with `--format json`/`toon`.
 
 ```sh
 $ slog stream --signpost --subsystem com.myapp --category perf --capture 20s
 interval         count  p50     max     total   last args
 parse.postImage  3      42.8ms  45.1ms  128ms   len 208123
 attr.chunk       7      1.1ms   7.0ms   9.8ms   start 0
+layout.measure   12     0.41ms  0.87ms  5.2ms   height 812 → rows 12 misses 3
 ```
 
 ### Configuration

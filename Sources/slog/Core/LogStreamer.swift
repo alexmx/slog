@@ -69,66 +69,22 @@ public struct LogStreamer: Sendable {
     public func stream(
         configuration: StreamConfiguration
     ) -> AsyncThrowingStream<LogEntry, Error> {
-        let parser = parser
         let (executable, arguments) = buildCommand(for: configuration)
-
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let result = try await run(
-                        executable,
-                        arguments: Arguments(arguments)
-                    ) { _, stdout in
-                        for try await line in stdout.lines() {
-                            if Task.isCancelled { break }
-                            if let entry = parser.parse(line: line) {
-                                continuation.yield(entry)
-                            }
-                        }
-                    }
-
-                    // Check termination status
-                    if case .exited(let code) = result.terminationStatus, code != 0 {
-                        continuation.finish(throwing: StreamError.logStreamError("Process exited with code \(code)"))
-                    } else {
-                        continuation.finish()
-                    }
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-
-            continuation.onTermination = { _ in
-                task.cancel()
-            }
+        return LogProcess.entries(executable: executable, arguments: arguments, parser: parser) {
+            StreamError.logStreamError($0)
         }
     }
 
     // MARK: - Private
 
     func buildCommand(for configuration: StreamConfiguration) -> (Executable, [String]) {
-        var args = ["stream", "--style", "ndjson"]
-
-        if configuration.includeInfo {
-            args.append("--info")
-        }
-
-        if configuration.includeDebug {
-            args.append("--debug")
-        }
-
-        if configuration.includeSource {
-            args.append("--source")
-        }
-
-        if configuration.includeSignposts {
-            args.append("--signpost")
-        }
-
-        if let predicate = configuration.predicate {
-            args.append("--predicate")
-            args.append(predicate)
-        }
+        let args = LogProcess.arguments(
+            "stream",
+            includeInfo: configuration.includeInfo,
+            includeDebug: configuration.includeDebug,
+            includeSource: configuration.includeSource,
+            includeSignposts: configuration.includeSignposts
+        ) + LogProcess.predicateArguments(configuration.predicate)
 
         switch configuration.target {
         case .local:
@@ -145,14 +101,11 @@ public struct LogStreamer: Sendable {
 
 public enum StreamError: Error, LocalizedError {
     case logStreamError(String)
-    case simulatorNotFound(String)
 
     public var errorDescription: String? {
         switch self {
         case .logStreamError(let message):
             "Log stream error: \(message)"
-        case .simulatorNotFound(let udid):
-            "Simulator not found: \(udid)"
         }
     }
 }
@@ -167,7 +120,7 @@ public struct PredicateBuilder: Sendable {
 
     /// Filter by process name (multiple values OR-grouped)
     public mutating func processes(_ names: [String]) {
-        appendOred(names.map { "processImagePath ENDSWITH \"/\($0)\"" })
+        appendOred(names.map { "processImagePath ENDSWITH \(Self.quoted("/" + $0))" })
     }
 
     /// Filter by process ID
@@ -177,17 +130,26 @@ public struct PredicateBuilder: Sendable {
 
     /// Filter by subsystem (uses BEGINSWITH to include child subsystems; multiple values OR-grouped)
     public mutating func subsystems(_ values: [String]) {
-        appendOred(values.map { "subsystem BEGINSWITH \"\($0)\"" })
+        appendOred(values.map { "subsystem BEGINSWITH \(Self.quoted($0))" })
     }
 
     /// Filter by category (multiple values OR-grouped)
     public mutating func categories(_ values: [String]) {
-        appendOred(values.map { "category == \"\($0)\"" })
+        appendOred(values.map { "category == \(Self.quoted($0))" })
     }
 
     /// Restrict to `os_signpost` events (begin/end/event records).
     public mutating func signpostsOnly() {
         components.append("eventType == \"signpostEvent\"")
+    }
+
+    /// A double-quoted predicate string literal, with `\` and `"` escaped so
+    /// the value is matched literally.
+    static func quoted(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
     }
 
     private mutating func appendOred(_ parts: [String]) {

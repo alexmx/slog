@@ -31,15 +31,36 @@ struct ShowConfigurationTests {
         }
     }
 
-    @Test
-    func lastBoot() {
-        let config = ShowConfiguration(timeRange: .lastBoot)
+    // MARK: - TimeRange(last:start:end:)
 
-        if case .lastBoot = config.timeRange {
-            // OK
-        } else {
-            Issue.record("Expected .lastBoot time range")
-        }
+    @Test
+    func timeRangeFromLast() {
+        #expect(ShowConfiguration.TimeRange(last: "5m", start: nil, end: nil) == .last("5m"))
+    }
+
+    @Test
+    func timeRangeNormalizesBootCase() {
+        #expect(ShowConfiguration.TimeRange(last: "Boot", start: nil, end: nil) == .last("boot"))
+        #expect(ShowConfiguration.TimeRange(last: "BOOT", start: nil, end: nil) == .last("boot"))
+    }
+
+    @Test
+    func timeRangeFromStartOnly() {
+        #expect(ShowConfiguration.TimeRange(last: nil, start: "2024-01-15", end: nil) == .start("2024-01-15"))
+    }
+
+    @Test
+    func timeRangeFromStartAndEnd() {
+        #expect(
+            ShowConfiguration.TimeRange(last: nil, start: "2024-01-15", end: "2024-01-16")
+                == .range(start: "2024-01-15", end: "2024-01-16")
+        )
+    }
+
+    @Test
+    func timeRangeIgnoresEndWithoutStart() {
+        #expect(ShowConfiguration.TimeRange(last: nil, start: nil, end: "2024-01-16") == nil)
+        #expect(ShowConfiguration.TimeRange(last: nil, start: nil, end: nil) == nil)
     }
 
     @Test
@@ -123,7 +144,7 @@ struct LogReaderCommandTests {
 
     @Test
     func lastBootArg() {
-        let config = ShowConfiguration(timeRange: .lastBoot)
+        let config = ShowConfiguration(timeRange: .last("boot"))
         let args = reader.buildArguments(for: config)
 
         #expect(args.contains("--last"))

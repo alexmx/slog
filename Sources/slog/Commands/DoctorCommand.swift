@@ -19,13 +19,12 @@ struct DoctorCommand: ParsableCommand {
         print("slog doctor\n")
 
         let checks = DoctorCheck.runAll()
-        var allPassed = true
 
         for check in checks {
             let label = switch check.status {
-            case "ok": "OK"
-            case "info": "INFO"
-            default: "FAIL"
+            case .ok: "OK"
+            case .info: "INFO"
+            case .fail: "FAIL"
             }
             print("  [\(label)] \(check.name)")
 
@@ -34,14 +33,10 @@ struct DoctorCommand: ParsableCommand {
                     print("        \(line)")
                 }
             }
-
-            if check.status == "fail" {
-                allPassed = false
-            }
         }
 
         print("")
-        if allPassed {
+        if checks.allSatisfy({ $0.status != .fail }) {
             print("All checks passed. slog is ready to use.")
         } else {
             print("Some checks failed. See hints above.")

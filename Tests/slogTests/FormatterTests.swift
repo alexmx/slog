@@ -65,15 +65,6 @@ struct PlainFormatterTests {
     }
 
     @Test
-    func hideTimestamp() {
-        let formatter = PlainFormatter(showTimestamp: false)
-        let output = formatter.format(makeEntry())
-
-        // Should start with level bracket
-        #expect(output.hasPrefix("[INFO]"))
-    }
-
-    @Test
     func hideProcess() {
         let formatter = PlainFormatter(showProcess: false)
         let output = formatter.format(makeEntry())
@@ -135,6 +126,15 @@ struct ColorFormatterTests {
         // Rainbow applies ANSI escape codes; verify the output is different from info
         let infoOutput = formatter.format(makeEntry(level: .info))
         #expect(output != infoOutput)
+    }
+
+    @Test
+    func invalidHighlightPatternLeavesMessageUnhighlighted() {
+        let entry = makeEntry()
+        let unhighlighted = ColorFormatter(timestampFormatter: TimestampFormatter())
+        let invalid = ColorFormatter(highlightPattern: "(", timestampFormatter: TimestampFormatter())
+
+        #expect(invalid.format(entry) == unhighlighted.format(entry))
     }
 
     @Test

@@ -83,4 +83,22 @@ struct TimestampFormatterTests {
         let result = formatter.format(base.addingTimeInterval(1.5))
         #expect(result == "+0.500s")
     }
+
+    @Test
+    func relativeModeIsSafeAcrossConcurrentCallers() async {
+        let formatter = TimestampFormatter(mode: .relative)
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let outputs = await withTaskGroup(of: String.self) { group in
+            for i in 0..<500 {
+                group.addTask { formatter.format(base.addingTimeInterval(Double(i) / 1000)) }
+            }
+            return await group.reduce(into: [String]()) { $0.append($1) }
+        }
+
+        #expect(outputs.count == 500)
+        // Exactly one call sees no previous timestamp.
+        #expect(outputs.count { $0 == "+0.000s" } == 1)
+        #expect(outputs.allSatisfy { $0.hasPrefix("+") || $0.hasPrefix("-") })
+    }
 }

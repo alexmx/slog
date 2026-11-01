@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// A chain of filters that processes log entries
+/// Predicates applied to log entries client-side; an entry must match all of them.
 public struct FilterChain: Sendable {
     private var predicates: [any LogPredicate] = []
 
@@ -18,68 +18,29 @@ public struct FilterChain: Sendable {
         predicates.append(predicate)
     }
 
-    /// Add a process name filter
-    @discardableResult
-    public mutating func process(_ name: String) -> FilterChain {
-        add(ProcessNamePredicate(processName: name))
-        return self
-    }
-
     /// Add a process ID filter
-    @discardableResult
-    public mutating func pid(_ pid: Int) -> FilterChain {
+    public mutating func pid(_ pid: Int) {
         add(ProcessIDPredicate(pid: pid))
-        return self
-    }
-
-    /// Add a subsystem filter
-    @discardableResult
-    public mutating func subsystem(_ subsystem: String, matchPrefix: Bool = false) -> FilterChain {
-        add(SubsystemPredicate(subsystem: subsystem, matchPrefix: matchPrefix))
-        return self
-    }
-
-    /// Add a category filter
-    @discardableResult
-    public mutating func category(_ category: String) -> FilterChain {
-        add(CategoryPredicate(category: category))
-        return self
     }
 
     /// Add a minimum log level filter
-    @discardableResult
-    public mutating func minimumLevel(_ level: LogLevel) -> FilterChain {
+    public mutating func minimumLevel(_ level: LogLevel) {
         add(MinimumLevelPredicate(minimumLevel: level))
-        return self
     }
 
     /// Add a regex filter on the message
-    @discardableResult
-    public mutating func messageRegex(_ pattern: String) throws -> FilterChain {
+    public mutating func messageRegex(_ pattern: String) throws {
         try add(MessageRegexPredicate(pattern: pattern))
-        return self
     }
 
     /// Add an exclusion regex filter on the message (NOT match)
-    @discardableResult
-    public mutating func excludeMessageRegex(_ pattern: String) throws -> FilterChain {
+    public mutating func excludeMessageRegex(_ pattern: String) throws {
         try add(NotPredicate(MessageRegexPredicate(pattern: pattern)))
-        return self
     }
 
-    /// Test if an entry passes all filters
+    /// Test if an entry passes all filters. An empty chain matches everything.
     public func matches(_ entry: LogEntry) -> Bool {
         predicates.allSatisfy { $0.matches(entry) }
-    }
-
-    /// Filter a sequence of entries
-    public func filter(_ entries: [LogEntry]) -> [LogEntry] {
-        entries.filter { matches($0) }
-    }
-
-    /// Remove all predicates
-    public mutating func clear() {
-        predicates.removeAll()
     }
 
     /// Check if the chain has any predicates

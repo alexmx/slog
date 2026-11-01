@@ -18,51 +18,11 @@ struct ShowCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Load settings from a saved profile")
     var profile: String?
 
-    // MARK: - Filter Options
+    @OptionGroup(title: "Filter Options")
+    var filter: FilterOptions
 
-    @Option(name: .long, help: "Filter by process name (comma-separated for multiple, e.g. Finder,Dock)")
-    var process: String?
-
-    @Option(name: .long, help: "Filter by process ID")
-    var pid: Int?
-
-    @Option(
-        name: .long,
-        help: "Filter by subsystem (comma-separated for multiple, e.g. com.apple.network,com.apple.CFNetwork)"
-    )
-    var subsystem: String?
-
-    @Option(name: .long, help: "Filter by category (comma-separated for multiple, e.g. http,dns)")
-    var category: String?
-
-    @Option(name: .long, help: "Minimum log level (debug, info, default, error, fault)")
-    var level: LogLevel?
-
-    @Option(name: .long, help: "Filter messages by regex pattern")
-    var grep: String?
-
-    @Option(name: .long, help: "Exclude messages matching regex pattern")
-    var excludeGrep: String?
-
-    // MARK: - Output Options
-
-    @Option(name: .long, help: "Output format (plain, compact, color, json, toon)")
-    var format: OutputFormat?
-
-    @Option(name: .long, help: "Timestamp mode (absolute, relative)")
-    var time: TimeMode?
-
-    @Flag(name: .long, inversion: .prefixedNo, help: "Include info-level messages")
-    var info: Bool?
-
-    @Flag(name: .long, inversion: .prefixedNo, help: "Include debug-level messages")
-    var debug: Bool?
-
-    @Flag(name: .long, inversion: .prefixedNo, help: "Include source location info")
-    var source: Bool?
-
-    @Flag(name: .long, inversion: .prefixedNo, help: "Collapse consecutive identical messages")
-    var dedup: Bool?
+    @OptionGroup(title: "Output Options")
+    var output: OutputOptions
 
     @Flag(name: .long, help: "Report os_signpost interval durations instead of log messages")
     var signpost: Bool = false
@@ -113,70 +73,19 @@ struct ShowCommand: AsyncParsableCommand {
     // MARK: - Run
 
     func run() async throws {
-        // Load profile if specified
-        let prof = try profile.map { try ProfileManager.load($0) }
-
-        // Merge CLI args with profile (CLI wins when non-nil)
-        let effectiveProcess = process ?? prof?.process
-        let effectivePid = pid ?? prof?.pid
-        let effectiveSubsystem = subsystem ?? prof?.subsystem
-        let effectiveCategory = category ?? prof?.category
-        let effectiveLevel = level ?? prof?.resolvedLevel
-        let effectiveGrep = grep ?? prof?.grep
-        let effectiveExcludeGrep = excludeGrep ?? prof?.excludeGrep
-        let effectiveFormat = format ?? prof?.resolvedFormat ?? .color
-        let effectiveInfo = info ?? prof?.info ?? false
-        let effectiveDebug = debug ?? prof?.debug ?? false
-        let effectiveSource = source ?? prof?.source ?? false
-        let effectiveTime = time ?? prof?.resolvedTimeMode ?? .absolute
-        let effectiveDedup = dedup ?? prof?.dedup ?? false
-
-        let formatter = FormatterRegistry.formatter(
-            for: effectiveFormat,
-            highlightPattern: effectiveGrep,
-            timeMode: effectiveTime
-        )
-        let dedupWriter = effectiveDedup ? DedupWriter(formatter: formatter) : nil
-
-        // Build predicate, filter chain, and log level inclusion
-        let setup = try FilterSetup.build(
-            processes: FilterSetup.splitCSV(effectiveProcess),
-            pid: effectivePid,
-            subsystems: FilterSetup.splitCSV(effectiveSubsystem),
-            categories: FilterSetup.splitCSV(effectiveCategory),
-            level: effectiveLevel,
-            grep: effectiveGrep,
-            excludeGrep: effectiveExcludeGrep,
-            info: effectiveInfo,
-            debug: effectiveDebug,
-            signpost: signpost
-        )
-
-        // Determine time range
-        let timeRange: ShowConfiguration.TimeRange? = if let last {
-            if last.lowercased() == "boot" {
-                .lastBoot
-            } else {
-                .last(last)
-            }
-        } else if let start {
-            if let end {
-                .range(start: start, end: end)
-            } else {
-                .start(start)
-            }
-        } else {
-            nil
-        }
+        let options = try ResolvedOptions(filter: filter, output: output, profileName: profile)
+        let formatter = options.formatter()
+        let dedupWriter = options.dedup ? DedupWriter(formatter: formatter) : nil
+        let setup = try options.filterSetup(signpost: signpost)
 
         // Create configuration
         let config = ShowConfiguration(
-            timeRange: timeRange,
+            timeRange: ShowConfiguration.TimeRange(last: last, start: start, end: end),
             archivePath: archivePath,
             predicate: setup.predicate,
             includeInfo: setup.includeInfo,
             includeDebug: setup.includeDebug,
-            includeSource: effectiveSource,
+            includeSource: options.source,
             includeSignposts: signpost
         )
 
@@ -186,7 +95,7 @@ struct ShowCommand: AsyncParsableCommand {
 
         // Signpost mode: aggregate begin/end events into interval durations.
         if signpost {
-            try await runSignpost(stream: stream, format: effectiveFormat)
+            try await runSignpost(stream: stream, format: options.format)
             return
         }
 
@@ -194,7 +103,7 @@ struct ShowCommand: AsyncParsableCommand {
         do {
             for try await entry in stream {
                 // Apply client-side filters
-                guard setup.filterChain.isEmpty || setup.filterChain.matches(entry) else {
+                guard setup.filterChain.matches(entry) else {
                     continue
                 }
 

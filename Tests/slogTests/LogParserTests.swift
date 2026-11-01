@@ -97,6 +97,59 @@ struct LogParserTests {
     }
 
     @Test
+    func parseSignpostEndCarriesMessage() {
+        // `endInterval(_:_:"%{public}s")` attaches results to the end event.
+        let json = """
+        {"timestamp":"2026-06-26 13:23:32.760000+0100","processImagePath":"/usr/bin/emitter","processID":4242,"subsystem":"com.slog.test","category":"signpost","eventType":"signpostEvent","eventMessage":"rows 12 misses 3","signpostID":1,"signpostName":"render.draw","signpostType":"end","signpostScope":"process"}
+        """
+
+        #expect(parser.parse(line: json)?.message == "rows 12 misses 3")
+    }
+
+    // MARK: - Timestamp precision
+
+    @Test
+    func appleTimestampKeepsMicroseconds() throws {
+        let begin = try #require(LogTimestamp.parse("2026-06-26 13:23:32.715547+0100"))
+        let end = try #require(LogTimestamp.parse("2026-06-26 13:23:32.716012+0100"))
+        // 0.465ms — DateFormatter alone would truncate both to .715/.716 → 1ms.
+        #expect(abs(end.timeIntervalSince(begin) * 1000 - 0.465) < 0.001)
+    }
+
+    @Test
+    func isoTimestampKeepsMicroseconds() throws {
+        let begin = try #require(LogTimestamp.parse("2024-01-15T10:30:45.123456Z"))
+        let end = try #require(LogTimestamp.parse("2024-01-15T10:30:45.123789Z"))
+        #expect(abs(end.timeIntervalSince(begin) * 1000 - 0.333) < 0.001)
+    }
+
+    @Test
+    func timestampParsesAbsoluteTime() {
+        let iso = LogTimestamp.parse("2024-01-15T10:30:45.5Z")
+        let apple = LogTimestamp.parse("2024-01-15 11:30:45.500000+0100")
+        let whole = LogTimestamp.parse("2024-01-15T10:30:45Z")
+        #expect(iso == Date(timeIntervalSince1970: 1_705_314_645.5))
+        #expect(apple == iso)
+        #expect(whole == Date(timeIntervalSince1970: 1_705_314_645))
+    }
+
+    @Test
+    func timestampRejectsGarbage() {
+        #expect(LogTimestamp.parse("not a date") == nil)
+        #expect(LogTimestamp.parse("") == nil)
+    }
+
+    @Test
+    func parsedEntryKeepsMicroseconds() throws {
+        let line = """
+        {"timestamp":"2026-06-26 13:23:32.715547+0100","processID":1,"eventMessage":"x"}
+        """
+        let entry = try #require(parser.parse(line: line))
+        let micros = entry.timestamp.timeIntervalSince1970 * 1_000_000
+        #expect(abs(micros.truncatingRemainder(dividingBy: 1_000_000) - 715_547) < 1)
+    }
+
+    @Test
     func parseSignpostEventIDExceedingInt64() {
         // `emitEvent` IDs use the exclusive ID, which overflows Int64.
         let json = """

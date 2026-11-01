@@ -15,7 +15,8 @@ struct SignpostFormatterTests {
         name: String,
         id: UInt64,
         durationMs: Double?,
-        message: String
+        message: String,
+        endMessage: String? = nil
     ) -> SignpostInterval {
         SignpostInterval(
             name: name,
@@ -26,7 +27,8 @@ struct SignpostFormatterTests {
             start: Self.base,
             end: durationMs.map { Self.base.addingTimeInterval($0 / 1000) },
             durationMs: durationMs,
-            message: message
+            message: message,
+            endMessage: endMessage
         )
     }
 
@@ -56,7 +58,7 @@ struct SignpostFormatterTests {
                     subsystem: i.subsystem,
                     category: i.category,
                     level: .default,
-                    message: "",
+                    message: i.endMessage ?? "",
                     eventType: "signpostEvent",
                     signpostID: i.signpostID,
                     signpostName: i.name,
@@ -78,6 +80,17 @@ struct SignpostFormatterTests {
         #expect(table.contains("parse.postImage"))
         #expect(table.contains("len 208123"))
         #expect(table.contains("42.0ms"))
+    }
+
+    @Test
+    func tableShowsBeginAndEndArgs() {
+        let summaries = aggregate([
+            interval(name: "render.draw", id: 1, durationMs: 0.4, message: "height 812", endMessage: "rows 12")
+        ])
+        let table = SignpostFormatter.renderTable(summaries)
+
+        #expect(table.contains("height 812 → rows 12"))
+        #expect(table.contains("0.40ms"))
     }
 
     @Test
@@ -114,6 +127,7 @@ struct SignpostFormatterTests {
     func formatMsCompactsLargeValues() {
         #expect(SignpostFormatter.formatMs(128) == "128ms")
         #expect(SignpostFormatter.formatMs(1.1) == "1.1ms")
+        #expect(SignpostFormatter.formatMs(0.437) == "0.44ms")
         #expect(SignpostFormatter.formatMs(nil) == "-")
     }
 
@@ -134,6 +148,22 @@ struct SignpostFormatterTests {
         // Occurrences are included in the CLI JSON variant.
         let occurrences = try #require(first["occurrences"] as? [[String: Any]])
         #expect(occurrences.first?["message"] as? String == "len 208123")
+        // No end args → key omitted.
+        #expect(occurrences.first?["end_message"] == nil)
+    }
+
+    @Test
+    func jsonIncludesEndMessageAndSubMsDuration() throws {
+        let summaries = aggregate([
+            interval(name: "render.draw", id: 1, durationMs: 0.437, message: "height 812", endMessage: "rows 12")
+        ])
+        let json = SignpostFormatter.render(summaries, format: .json)
+
+        let parsed = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]
+        let occurrence = try #require((parsed?.first?["occurrences"] as? [[String: Any]])?.first)
+        #expect(occurrence["end_message"] as? String == "rows 12")
+        let duration = try #require(occurrence["duration_ms"] as? Double)
+        #expect(abs(duration - 0.437) < 0.0015)
     }
 
     @Test

@@ -20,7 +20,7 @@ public struct JSONFormatter: LogFormatter {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = pretty ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
 
-        let data = (try? encoder.encode(FormattedEntry(from: entry))) ?? Data()
+        let data = (try? encoder.encode(entry)) ?? Data()
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 }

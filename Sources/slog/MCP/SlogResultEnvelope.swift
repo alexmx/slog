@@ -157,6 +157,11 @@ enum NDJSONSpill {
     /// Async stream of `LogEntry` decoded one-per-line from an NDJSON file —
     /// the symmetric reader for spill files written by `write(items:to:)`.
     /// Surfaces parse failures with the offending line number for fast triage.
+    ///
+    /// Reads the file directly rather than through `URL.lines`: Foundation runs
+    /// every FileHandle async-bytes read on one shared queue, and the MCP
+    /// server's stdin reader occupies it while waiting for the next request.
+    /// Spills are written from an in-memory array, so reading one whole is fine.
     static func readEntries(from url: URL) -> AsyncThrowingStream<LogEntry, Error> {
         AsyncThrowingStream { continuation in
             guard FileManager.default.isReadableFile(atPath: url.path) else {
@@ -166,31 +171,36 @@ enum NDJSONSpill {
                 return
             }
 
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-
             let task = Task {
+                let data: Data
                 do {
-                    var lineNumber = 0
-                    for try await line in url.lines {
-                        lineNumber += 1
-                        let trimmed = line.trimmingCharacters(in: .whitespaces)
-                        if trimmed.isEmpty { continue }
-                        guard let data = trimmed.data(using: .utf8) else { continue }
-                        do {
-                            let entry = try decoder.decode(LogEntry.self, from: data)
-                            continuation.yield(entry)
-                        } catch {
-                            continuation.finish(
-                                throwing: SpillError.parseError(url, lineNumber, error.localizedDescription)
-                            )
-                            return
-                        }
-                    }
-                    continuation.finish()
+                    data = try Data(contentsOf: url)
                 } catch {
-                    continuation.finish(throwing: error)
+                    continuation.finish(throwing: SpillError.readFailed(url, error.localizedDescription))
+                    return
                 }
+
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                let lines = data.split(separator: 0x0A, omittingEmptySubsequences: false)
+                for (index, line) in lines.enumerated() {
+                    if Task.isCancelled {
+                        break
+                    }
+                    let trimmed = String(decoding: line, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.isEmpty {
+                        continue
+                    }
+                    do {
+                        try continuation.yield(decoder.decode(LogEntry.self, from: Data(trimmed.utf8)))
+                    } catch {
+                        continuation.finish(
+                            throwing: SpillError.parseError(url, index + 1, error.localizedDescription)
+                        )
+                        return
+                    }
+                }
+                continuation.finish()
             }
             continuation.onTermination = { _ in task.cancel() }
         }

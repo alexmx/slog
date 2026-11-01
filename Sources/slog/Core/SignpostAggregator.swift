@@ -27,9 +27,11 @@ public struct SignpostInterval: Sendable, Equatable {
     public let end: Date?
     /// `end - start` in milliseconds, or `nil` while in-flight.
     public let durationMs: Double?
-    /// Interpolated arguments — carried from the begin event (the end event's
-    /// message is empty).
+    /// Interpolated arguments from the begin event.
     public let message: String
+    /// Interpolated arguments from the end event (e.g. results attached when the
+    /// work finishes), or `nil` while in-flight or when the end carried none.
+    public let endMessage: String?
 
     /// Whether the interval is still open (no matching end was seen).
     public var isInFlight: Bool {
@@ -45,7 +47,8 @@ public struct SignpostInterval: Sendable, Equatable {
         start: Date,
         end: Date?,
         durationMs: Double?,
-        message: String
+        message: String,
+        endMessage: String? = nil
     ) {
         self.name = name
         self.subsystem = subsystem
@@ -56,6 +59,7 @@ public struct SignpostInterval: Sendable, Equatable {
         self.end = end
         self.durationMs = durationMs
         self.message = message
+        self.endMessage = endMessage
     }
 }
 
@@ -195,7 +199,8 @@ public struct SignpostAggregator: Sendable {
             start: begin.timestamp,
             end: end.timestamp,
             durationMs: durationMs,
-            message: begin.message
+            message: begin.message,
+            endMessage: end.message.isEmpty ? nil : end.message
         )
     }
 

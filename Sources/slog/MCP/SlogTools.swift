@@ -6,179 +6,6 @@
 import Foundation
 import SwiftMCP
 
-/// Thread-safe sendable one-shot flag
-final class SendableBoolFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = false
-
-    func set() {
-        lock.lock()
-        defer { lock.unlock() }
-        value = true
-    }
-
-    func get() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return value
-    }
-}
-
-/// Thread-safe sendable container for collecting log entries
-class SendableEntryContainer: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _entries: [LogEntry] = []
-
-    var entries: [LogEntry] {
-        lock.lock()
-        defer { lock.unlock() }
-        return _entries
-    }
-
-    func append(_ entry: LogEntry) {
-        lock.lock()
-        defer { lock.unlock() }
-        _entries.append(entry)
-    }
-
-    var count: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return _entries.count
-    }
-}
-
-/// Response shape for `slog_show`. Defaults to a token-cheap envelope:
-/// `summary` plus a `head`/`tail` sample with the full payload spilled to
-/// `output_file` as NDJSON. Set `full: true` (or stay under the inline
-/// threshold) to get all entries inline instead.
-///
-/// `hint` is populated only when `count == 0` and we can guess why
-/// (custom-subsystem debug persistence, process-only query, too-short window).
-struct ShowResult: Encodable {
-    let count: Int
-    let elapsedMs: Int
-    let scanCapped: Bool
-    let truncated: Bool
-    let summary: ResultSummary?
-    let entries: [LogEntry]?
-    let head: [LogEntry]?
-    let tail: [LogEntry]?
-    let outputFile: String?
-    let nextSince: Date?
-    let hint: String?
-
-    enum CodingKeys: String, CodingKey {
-        case count
-        case truncated
-        case summary
-        case entries
-        case head
-        case tail
-        case hint
-        case elapsedMs = "elapsed_ms"
-        case outputFile = "output_file"
-        case scanCapped = "scan_capped"
-        case nextSince = "next_since"
-    }
-}
-
-/// Response shape for `slog_list_processes`. Same truncation contract as
-/// `ShowResult` (small results inline as `processes`; large results truncate
-/// to `head`/`tail` with the full list spilled as NDJSON to `output_file`).
-/// `filter` lets callers narrow before they ever hit the threshold.
-struct ProcessListResult: Encodable {
-    let count: Int
-    let truncated: Bool
-    let processes: [RunningProcess]?
-    let head: [RunningProcess]?
-    let tail: [RunningProcess]?
-    let outputFile: String?
-
-    enum CodingKeys: String, CodingKey {
-        case count
-        case truncated
-        case processes
-        case head
-        case tail
-        case outputFile = "output_file"
-    }
-}
-
-/// Response shape for `slog_stream`. Same truncation contract as `ShowResult`
-/// (see above) plus stream-specific diagnostics: `stoppedBy` tells callers
-/// whether an empty result means "nothing matched in the time window"
-/// (`timeout`) or "stream itself closed before the count was reached"
-/// (`exhausted`).
-struct StreamResult: Encodable {
-    let captured: Int
-    let requested: Int
-    /// `count` (reached requested limit) | `timeout` | `exhausted` | `error`
-    let stoppedBy: String
-    let elapsedMs: Int
-    let truncated: Bool
-    let summary: ResultSummary?
-    let entries: [LogEntry]?
-    let head: [LogEntry]?
-    let tail: [LogEntry]?
-    let outputFile: String?
-    /// Underlying failure description when `stoppedBy == "error"`. Lets agents
-    /// distinguish "stream crashed" from "no matches" without parsing log noise.
-    let errorMessage: String?
-    /// Set when `stoppedBy == "error"` AND `captured == 0` — heuristic for
-    /// "stream never opened, probably system/permission level." Mid-flight
-    /// failures (some entries captured) skip the flag since doctor won't help.
-    let tryDoctor: Bool?
-
-    enum CodingKeys: String, CodingKey {
-        case captured
-        case requested
-        case truncated
-        case summary
-        case entries
-        case head
-        case tail
-        case stoppedBy = "stopped_by"
-        case elapsedMs = "elapsed_ms"
-        case outputFile = "output_file"
-        case errorMessage = "error_message"
-        case tryDoctor = "try_doctor"
-    }
-}
-
-/// Response shape for `slog_signpost`. Aggregated os_signpost intervals grouped
-/// by name, with per-name duration stats. `mode` distinguishes the persisted
-/// `show` query from a live `stream` capture. `hint` is populated only when
-/// `count == 0`.
-struct SignpostResult: Encodable {
-    /// Total interval occurrences across all names (completed + in-flight).
-    let count: Int
-    let inFlight: Int
-    let orphanEnds: Int
-    let elapsedMs: Int
-    /// `show` (persisted query) | `stream` (live capture).
-    let mode: String
-    let intervals: [FormattedSignpost]
-    let hint: String?
-    /// Live-capture only: `timeout` | `exhausted` | `error`.
-    let stoppedBy: String?
-    let errorMessage: String?
-    let tryDoctor: Bool?
-
-    enum CodingKeys: String, CodingKey {
-        case count
-        case mode
-        case intervals
-        case hint
-        case inFlight = "in_flight"
-        case orphanEnds = "orphan_ends"
-        case elapsedMs = "elapsed_ms"
-        case stoppedBy = "stopped_by"
-        case errorMessage = "error_message"
-        case tryDoctor = "try_doctor"
-    }
-}
-
 enum SlogTools {
     // MARK: - Helpers
 
@@ -189,244 +16,84 @@ enum SlogTools {
         return encoder
     }()
 
-    private static func json(_ value: some Encodable) throws -> MCPToolResult {
-        let data = try encoder.encode(value)
-        return .text(String(decoding: data, as: UTF8.self))
+    /// A tool failure, returned to the caller as `{ "error": …, "try_doctor"?: true }`.
+    /// Set `tryDoctor` on system-level errors (missing `log` CLI, permission
+    /// denied, simctl unavailable) so the agent calls `slog_doctor` once before
+    /// retrying. Leave it off for validation/user errors doctor can't explain.
+    struct ToolError: Error {
+        let message: String
+        var tryDoctor = false
+
+        /// A system-level failure the agent should diagnose with `slog_doctor`.
+        static func system(_ error: any Error) -> ToolError {
+            ToolError(message: error.localizedDescription, tryDoctor: true)
+        }
     }
 
-    /// `{ "error": "<message>", "try_doctor"?: true }` payload for tool failures.
-    /// Set `tryDoctor: true` on system-level errors (missing `log` CLI, permission
-    /// denied, simctl unavailable) so the agent knows to call `slog_doctor` once
-    /// before retrying. Leave it off for validation/user errors that doctor
-    /// wouldn't shed light on.
-    private static func errorJSON(_ message: String, tryDoctor: Bool = false) -> MCPToolResult {
-        var payload: [String: AnyEncodable] = ["error": AnyEncodable(message)]
-        if tryDoctor {
-            payload["try_doctor"] = AnyEncodable(true)
+    private struct ErrorPayload: Encodable {
+        let error: String
+        let tryDoctor: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case error
+            case tryDoctor = "try_doctor"
         }
+    }
+
+    /// Runs a tool body and encodes its result as JSON. A thrown `ToolError`
+    /// becomes the error payload as-is; any other error keeps its description
+    /// and doesn't set `try_doctor`.
+    static func respond(_ body: () async throws -> some Encodable) async -> MCPToolResult {
+        do {
+            let data = try await encoder.encode(body())
+            return .text(String(decoding: data, as: UTF8.self))
+        } catch let error as ToolError {
+            return errorJSON(error.message, tryDoctor: error.tryDoctor)
+        } catch {
+            return errorJSON(error.localizedDescription, tryDoctor: false)
+        }
+    }
+
+    private static func errorJSON(_ message: String, tryDoctor: Bool) -> MCPToolResult {
+        let payload = ErrorPayload(error: message, tryDoctor: tryDoctor ? true : nil)
         guard let data = try? encoder.encode(payload) else {
             return .text("{\"error\":\"Failed to encode error\"}")
         }
         return .text(String(decoding: data, as: UTF8.self))
     }
 
-    /// Type-erased Encodable for building heterogeneous error payloads without
-    /// pulling in a third-party JSON library.
-    private struct AnyEncodable: Encodable {
-        private let encoder: (Encoder) throws -> Void
-        init(_ value: some Encodable) {
-            self.encoder = { try value.encode(to: $0) }
+    /// Parses MCP's `level` argument (any case), rejecting unknown values
+    /// instead of silently dropping the level filter.
+    static func parseLevel(_ value: String?) throws -> LogLevel? {
+        guard let value else { return nil }
+        guard let level = LogLevel(string: value) else {
+            let expected = LogLevel.allValueStrings.joined(separator: ", ")
+            throw ToolError(message: "Invalid 'level' '\(value)'. Expected one of: \(expected)")
         }
-
-        func encode(to encoder: Encoder) throws {
-            try self.encoder(encoder)
-        }
+        return level
     }
 
-    /// Outcome of `buildFilterSetup`: the parsed setup or a ready-to-return
-    /// error envelope. Lets MCP handlers do `switch … case .failure: return`
-    /// without nested do/catch around the shared setup step.
-    enum FilterSetupOutcome {
-        case ok(FilterSetup)
-        case failed(MCPToolResult)
-    }
-
-    /// Build a `FilterSetup` from MCP args, packaging `FilterSetupError` into
-    /// an `errorJSON` payload.
-    private static func buildFilterSetup(
+    /// Build a `FilterSetup` from MCP's optional array arguments.
+    private static func filterSetup(
         processes: [String]?,
         pid: Int?,
         subsystems: [String]?,
         categories: [String]?,
-        level: String?,
-        grep: String?,
-        excludeGrep: String?
-    ) -> FilterSetupOutcome {
-        do {
-            let setup = try FilterSetup.build(
-                processes: processes ?? [],
-                pid: pid,
-                subsystems: subsystems ?? [],
-                categories: categories ?? [],
-                level: level.flatMap { LogLevel(string: $0) },
-                grep: grep,
-                excludeGrep: excludeGrep
-            )
-            return .ok(setup)
-        } catch let error as FilterSetupError {
-            return .failed(errorJSON(error.errorDescription ?? "\(error)"))
-        } catch {
-            return .failed(errorJSON("\(error)"))
-        }
-    }
-
-    // MARK: - Argument Types
-
-    struct ShowArgs: MCPToolInput {
-        @InputProperty("Time range: duration ('5m', '1h') or 'boot'.")
-        var last: String?
-
-        @InputProperty("Range start, e.g. '2024-01-15 10:30:00'. Use with `end` instead of `last`.")
-        var start: String?
-
-        @InputProperty("Range end. Omit to query to now.")
-        var end: String?
-
-        @InputProperty(
-            "Process name(s), array, OR-matched, exact case-sensitive match. e.g. [\"Finder\", \"Dock\"]. Skip `slog_list_processes` if you have a confident name."
+        level: String? = nil,
+        grep: String? = nil,
+        excludeGrep: String? = nil,
+        signpost: Bool = false
+    ) throws -> FilterSetup {
+        try FilterSetup.build(
+            processes: processes ?? [],
+            pid: pid,
+            subsystems: subsystems ?? [],
+            categories: categories ?? [],
+            level: parseLevel(level),
+            grep: grep,
+            excludeGrep: excludeGrep,
+            signpost: signpost
         )
-        var process: [String]?
-
-        @InputProperty("Process ID.")
-        var pid: Int?
-
-        @InputProperty("Subsystem(s), array, OR-matched. Auto-includes debug+info.")
-        var subsystem: [String]?
-
-        @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem`.")
-        var category: [String]?
-
-        @InputProperty(
-            "Min level (this level and above): debug, info, default, error, fault. `error` matches error+fault, not error alone."
-        )
-        var level: String?
-
-        @InputProperty("Regex filter on message (client-side).")
-        var grep: String?
-
-        @InputProperty("Regex exclusion on message, e.g. 'heartbeat|keepalive'.")
-        var exclude_grep: String?
-
-        @InputProperty(
-            "Max entries retained for `entries`/`head`/`tail`/`output_file` (default 500). Summary always scans the full population up to 100k events."
-        )
-        var limit: Int?
-
-        @InputProperty("Path to a .logarchive file (alternative to `last`/`start`).")
-        var archive_path: String?
-
-        @InputProperty(
-            "Re-query a previous `output_file` instead of scanning the OS log database. Cheap iterative drill-down. Mutex with `last`/`start`/`end`/`archive_path`."
-        )
-        var source_file: String?
-
-        @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
-        var output_file: String?
-
-        @InputProperty("Inline every entry, bypassing truncation. Mutex with `summary_only`.")
-        var full: Bool?
-
-        @InputProperty("Return only the aggregate summary (no entries, no spill). Mutex with `full`.")
-        var summary_only: Bool?
-    }
-
-    struct StreamArgs: MCPToolInput {
-        @InputProperty(
-            "Process name(s), array, OR-matched, exact case-sensitive match. e.g. [\"Finder\", \"Dock\"]. Skip `slog_list_processes` if you have a confident name."
-        )
-        var process: [String]?
-
-        @InputProperty("Process ID.")
-        var pid: Int?
-
-        @InputProperty("Subsystem(s), array, OR-matched. Auto-includes debug+info.")
-        var subsystem: [String]?
-
-        @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem`.")
-        var category: [String]?
-
-        @InputProperty(
-            "Min level (this level and above): debug, info, default, error, fault. `error` matches error+fault, not error alone."
-        )
-        var level: String?
-
-        @InputProperty("Regex filter on message (client-side).")
-        var grep: String?
-
-        @InputProperty("Regex exclusion on message, e.g. 'heartbeat|keepalive'.")
-        var exclude_grep: String?
-
-        @InputProperty(
-            "Stop early after this many entries (1–1000). Omit to run until `timeout`; the call still caps at 1000 to bound memory."
-        )
-        var count: Int?
-
-        @InputProperty("Max wait seconds (default 30). Returns whatever is captured on timeout.")
-        var timeout: Int?
-
-        @InputProperty("Stream from iOS Simulator.")
-        var simulator: Bool?
-
-        @InputProperty("Simulator UDID (auto-detects if exactly one is booted).")
-        var simulator_udid: String?
-
-        @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
-        var output_file: String?
-
-        @InputProperty("Inline every entry, bypassing truncation.")
-        var full: Bool?
-    }
-
-    struct ListProcessesArgs: MCPToolInput {
-        @InputProperty("Name substring filter (case-insensitive).")
-        var filter: String?
-
-        @InputProperty("NDJSON spill path. Defaults to `$XDG_CACHE_HOME/slog/runs/` when truncated.")
-        var output_file: String?
-
-        @InputProperty("Inline every process, bypassing truncation.")
-        var full: Bool?
-    }
-
-    struct ListSimulatorsArgs: MCPToolInput {
-        @InputProperty("Only booted simulators (the streamable ones).")
-        var booted: Bool?
-
-        @InputProperty("Include unavailable simulators (uninstalled runtimes).")
-        var all: Bool?
-    }
-
-    struct SignpostArgs: MCPToolInput {
-        @InputProperty(
-            "Time range for the persisted query: duration ('5m', '1h') or 'boot'. Ignored when `live: true`."
-        )
-        var last: String?
-
-        @InputProperty("Range start, e.g. '2024-01-15 10:30:00'. Use with `end` instead of `last`.")
-        var start: String?
-
-        @InputProperty("Range end. Omit to query to now.")
-        var end: String?
-
-        @InputProperty("Path to a .logarchive file (alternative to `last`/`start`).")
-        var archive_path: String?
-
-        @InputProperty(
-            "Subsystem(s), array, OR-matched. Strongly recommended — signposts are keyed by subsystem (e.g. [\"com.myapp\"])."
-        )
-        var subsystem: [String]?
-
-        @InputProperty("Category(ies), array, OR-matched. Pair with `subsystem` (e.g. [\"perf\"]).")
-        var category: [String]?
-
-        @InputProperty("Process name(s), array, OR-matched, exact case-sensitive match.")
-        var process: [String]?
-
-        @InputProperty("Process ID.")
-        var pid: Int?
-
-        @InputProperty(
-            "Capture live instead of querying history. Pairs begin/end as events arrive and needs no persistence — the reliable path right after exercising the app."
-        )
-        var live: Bool?
-
-        @InputProperty("Live capture seconds (default 10, max 60). Only with `live: true`.")
-        var timeout: Int?
-
-        @InputProperty(
-            "Include per-occurrence detail (start, duration_ms, message) for each interval. Default false: aggregate stats only (token-cheap)."
-        )
-        var full: Bool?
     }
 
     // MARK: - Tools
@@ -463,159 +130,138 @@ enum SlogTools {
         includes `try_doctor: true` — call `slog_doctor` once and surface its findings before retrying.
         """
     ) { (args: ShowArgs) in
-        let full = args.full ?? false
-        let summaryOnly = args.summary_only ?? false
-        if full, summaryOnly {
-            return errorJSON("'full' and 'summary_only' are mutually exclusive")
-        }
-
-        // Validate source: exactly one of (source_file) or (last|start|archive_path)
-        if let sourcePath = args.source_file {
-            if args.last != nil || args.start != nil || args.end != nil || args.archive_path != nil {
-                return errorJSON(
-                    "'source_file' is mutually exclusive with 'last'/'start'/'end'/'archive_path'"
-                )
+        await respond {
+            let full = args.full ?? false
+            let summaryOnly = args.summary_only ?? false
+            if full, summaryOnly {
+                throw ToolError(message: "'full' and 'summary_only' are mutually exclusive")
             }
-            if let outPath = args.output_file {
-                let src = NDJSONSpill.resolveUserPath(sourcePath).standardizedFileURL
-                let out = NDJSONSpill.resolveUserPath(outPath).standardizedFileURL
-                if src == out {
-                    return errorJSON("'output_file' must differ from 'source_file' to avoid clobbering it mid-read")
+
+            // Validate source: exactly one of (source_file) or (last|start|archive_path)
+            if let sourcePath = args.source_file {
+                if args.last != nil || args.start != nil || args.end != nil || args.archive_path != nil {
+                    throw ToolError(
+                        message: "'source_file' is mutually exclusive with 'last'/'start'/'end'/'archive_path'"
+                    )
                 }
-            }
-        } else {
-            guard args.last != nil || args.start != nil || args.archive_path != nil else {
-                return errorJSON("Specify 'last', 'start', 'archive_path', or 'source_file'")
-            }
-        }
-
-        let setup: FilterSetup
-        switch buildFilterSetup(
-            processes: args.process,
-            pid: args.pid,
-            subsystems: args.subsystem,
-            categories: args.category,
-            level: args.level,
-            grep: args.grep,
-            excludeGrep: args.exclude_grep
-        ) {
-        case .ok(let value): setup = value
-        case .failed(let result): return result
-        }
-
-        let stream: AsyncThrowingStream<LogEntry, Error>
-        if let sourcePath = args.source_file {
-            // Replay a previous spill — filters/summary apply, no OS scan.
-            stream = NDJSONSpill.readEntries(from: NDJSONSpill.resolveUserPath(sourcePath))
-        } else {
-            let timeRange: ShowConfiguration.TimeRange? = if let last = args.last {
-                if last.lowercased() == "boot" {
-                    .lastBoot
-                } else {
-                    .last(last)
-                }
-            } else if let start = args.start {
-                if let end = args.end {
-                    .range(start: start, end: end)
-                } else {
-                    .start(start)
+                if let outPath = args.output_file {
+                    let src = NDJSONSpill.resolveUserPath(sourcePath).standardizedFileURL
+                    let out = NDJSONSpill.resolveUserPath(outPath).standardizedFileURL
+                    if src == out {
+                        throw ToolError(
+                            message: "'output_file' must differ from 'source_file' to avoid clobbering it mid-read"
+                        )
+                    }
                 }
             } else {
-                nil
+                guard args.last != nil || args.start != nil || args.archive_path != nil else {
+                    throw ToolError(message: "Specify 'last', 'start', 'archive_path', or 'source_file'")
+                }
             }
 
-            let config = ShowConfiguration(
-                timeRange: timeRange,
-                archivePath: args.archive_path,
-                predicate: setup.predicate,
-                includeInfo: setup.includeInfo,
-                includeDebug: setup.includeDebug
+            let setup = try filterSetup(
+                processes: args.process,
+                pid: args.pid,
+                subsystems: args.subsystem,
+                categories: args.category,
+                level: args.level,
+                grep: args.grep,
+                excludeGrep: args.exclude_grep
             )
-            stream = LogReader().read(configuration: config)
-        }
 
-        // `limit` caps retained entries (for inline/spill/head/tail). The summary
-        // accumulator always sees the full population so aggregates aren't biased
-        // toward the start of the window — capped only at the hard scan ceiling.
-        let retainCap = args.limit ?? 500
-        var entries: [LogEntry] = []
-        var accumulator = SummaryAccumulator()
-        var scanCapped = false
-        let started = Date()
-
-        do {
-            for try await entry in stream {
-                guard setup.filterChain.isEmpty || setup.filterChain.matches(entry) else { continue }
-                accumulator.add(entry)
-                if !summaryOnly, entries.count < retainCap {
-                    entries.append(entry)
-                }
-                if accumulator.count >= scanCeiling {
-                    scanCapped = true
-                    break
-                }
+            let stream: AsyncThrowingStream<LogEntry, Error>
+            if let sourcePath = args.source_file {
+                // Replay a previous spill — filters/summary apply, no OS scan.
+                stream = NDJSONSpill.readEntries(from: NDJSONSpill.resolveUserPath(sourcePath))
+            } else {
+                let config = ShowConfiguration(
+                    timeRange: ShowConfiguration.TimeRange(last: args.last, start: args.start, end: args.end),
+                    archivePath: args.archive_path,
+                    predicate: setup.predicate,
+                    includeInfo: setup.includeInfo,
+                    includeDebug: setup.includeDebug
+                )
+                stream = LogReader().read(configuration: config)
             }
-        } catch is CancellationError {
-            // Cancelled
-        } catch let spillError as NDJSONSpill.SpillError {
-            // File-level — caller's path or contents are wrong, not a system issue.
-            return errorJSON(spillError.localizedDescription)
-        } catch {
-            // Anything else from the live LogReader stream is a system-level
-            // failure (log CLI missing, no stream permission, etc.).
-            return errorJSON(error.localizedDescription, tryDoctor: true)
-        }
 
-        let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
-        let matched = accumulator.count
-        let summary = matched == 0 ? nil : accumulator.build()
-        let hint = matched == 0 ? emptyShowHint(args: args) : nil
-        // +1µs past the latest matched event so the next tailing call doesn't
-        // re-pull the boundary entry. Null when there were no matches — caller
-        // reuses their previous `since`.
-        let nextSince = accumulator.lastTimestamp.map { $0.addingTimeInterval(0.000_001) }
+            // `limit` caps retained entries (for inline/spill/head/tail). The summary
+            // accumulator always sees the full population so aggregates aren't biased
+            // toward the start of the window — capped only at the hard scan ceiling.
+            let retainCap = args.limit ?? 500
+            var entries: [LogEntry] = []
+            var accumulator = SummaryAccumulator()
+            var scanCapped = false
+            let started = Date()
 
-        if summaryOnly {
-            return try json(ShowResult(
-                count: matched,
-                elapsedMs: elapsedMs,
-                scanCapped: scanCapped,
-                truncated: false,
-                summary: summary,
-                entries: nil,
-                head: nil,
-                tail: nil,
-                outputFile: nil,
-                nextSince: nextSince,
-                hint: hint
-            ))
-        }
+            do {
+                for try await entry in stream {
+                    guard setup.filterChain.matches(entry) else { continue }
+                    accumulator.add(entry)
+                    if !summaryOnly, entries.count < retainCap {
+                        entries.append(entry)
+                    }
+                    if accumulator.count >= scanCeiling {
+                        scanCapped = true
+                        break
+                    }
+                }
+            } catch is CancellationError {
+                // Cancelled
+            } catch let spillError as NDJSONSpill.SpillError {
+                // File-level — caller's path or contents are wrong, not a system issue.
+                throw spillError
+            } catch {
+                // Anything else from the live LogReader stream is a system-level
+                // failure (log CLI missing, no stream permission, etc.).
+                throw ToolError.system(error)
+            }
 
-        let envelope: ResultEnvelopeBuilder.Output
-        do {
-            envelope = try ResultEnvelopeBuilder(
+            let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+            let matched = accumulator.count
+            let summary = matched == 0 ? nil : accumulator.build()
+            let hint = matched == 0 ? emptyShowHint(args: args) : nil
+            // +1µs past the latest matched event so the next tailing call doesn't
+            // re-pull the boundary entry. Null when there were no matches — caller
+            // reuses their previous `since`.
+            let nextSince = accumulator.lastTimestamp.map { $0.addingTimeInterval(0.000_001) }
+
+            if summaryOnly {
+                return ShowResult(
+                    count: matched,
+                    elapsedMs: elapsedMs,
+                    scanCapped: scanCapped,
+                    truncated: false,
+                    summary: summary,
+                    entries: nil,
+                    head: nil,
+                    tail: nil,
+                    outputFile: nil,
+                    nextSince: nextSince,
+                    hint: hint
+                )
+            }
+
+            let envelope = try ResultEnvelopeBuilder(
                 entries: entries,
                 full: full,
                 outputFile: args.output_file,
                 spillPrefix: "show"
             ).build()
-        } catch {
-            return errorJSON(error.localizedDescription)
-        }
 
-        return try json(ShowResult(
-            count: matched,
-            elapsedMs: elapsedMs,
-            scanCapped: scanCapped,
-            truncated: envelope.truncated,
-            summary: summary,
-            entries: envelope.inlineEntries,
-            head: envelope.head,
-            tail: envelope.tail,
-            outputFile: envelope.outputFile?.path,
-            nextSince: nextSince,
-            hint: hint
-        ))
+            return ShowResult(
+                count: matched,
+                elapsedMs: elapsedMs,
+                scanCapped: scanCapped,
+                truncated: envelope.truncated,
+                summary: summary,
+                entries: envelope.inlineEntries,
+                head: envelope.head,
+                tail: envelope.tail,
+                outputFile: envelope.outputFile?.path,
+                nextSince: nextSince,
+                hint: hint
+            )
+        }
     }
 
     /// Hard upper bound on how many matching events `slog_show` will scan in
@@ -670,142 +316,110 @@ enum SlogTools {
         includes `try_doctor: true` — call `slog_doctor` once and surface its findings before retrying.
         """
     ) { (args: StreamArgs) in
-        // `count` is optional; omitted means "until timeout", still capped at 1000
-        // so a chatty machine can't blow memory between timeout ticks.
-        let count: Int
-        if let explicit = args.count {
-            guard explicit > 0 else {
-                return errorJSON("'count' must be a positive integer")
+        await respond {
+            // `count` is optional; omitted means "until timeout", still capped at 1000
+            // so a chatty machine can't blow memory between timeout ticks.
+            let count: Int
+            if let explicit = args.count {
+                guard explicit > 0 else {
+                    throw ToolError(message: "'count' must be a positive integer")
+                }
+                guard explicit <= 1000 else {
+                    throw ToolError(
+                        message: "'count' must be <= 1000 (got \(explicit)). Use a smaller window or run multiple streams."
+                    )
+                }
+                count = explicit
+            } else {
+                count = 1000
             }
-            guard explicit <= 1000 else {
-                return errorJSON(
-                    "'count' must be <= 1000 (got \(explicit)). Use a smaller window or run multiple streams."
-                )
+
+            let setup = try filterSetup(
+                processes: args.process,
+                pid: args.pid,
+                subsystems: args.subsystem,
+                categories: args.category,
+                level: args.level,
+                grep: args.grep,
+                excludeGrep: args.exclude_grep
+            )
+
+            let target: StreamConfiguration.Target
+            if args.simulator == true {
+                do {
+                    let udid = try SystemQuery.resolveSimulatorUDID(args.simulator_udid)
+                    target = .simulator(udid: udid)
+                } catch {
+                    // simctl missing, no booted simulator, etc. — flag doctor so the
+                    // agent surfaces system state before retrying.
+                    throw ToolError.system(error)
+                }
+            } else {
+                target = .local
             }
-            count = explicit
-        } else {
-            count = 1000
-        }
 
-        let setup: FilterSetup
-        switch buildFilterSetup(
-            processes: args.process,
-            pid: args.pid,
-            subsystems: args.subsystem,
-            categories: args.category,
-            level: args.level,
-            grep: args.grep,
-            excludeGrep: args.exclude_grep
-        ) {
-        case .ok(let value): setup = value
-        case .failed(let result): return result
-        }
+            let config = StreamConfiguration(
+                target: target,
+                predicate: setup.predicate,
+                includeInfo: setup.includeInfo,
+                includeDebug: setup.includeDebug
+            )
 
-        let target: StreamConfiguration.Target
-        if args.simulator == true {
-            do {
-                let udid = try SystemQuery.resolveSimulatorUDID(args.simulator_udid)
-                target = .simulator(udid: udid)
-            } catch {
-                // simctl missing, no booted simulator, etc. — flag doctor so the
-                // agent surfaces system state before retrying.
-                return errorJSON(error.localizedDescription, tryDoctor: true)
+            let startTime = Date()
+            let (collected, stop) = await LogCapture.run(
+                LogStreamer().stream(configuration: config),
+                filter: setup.filterChain,
+                limits: .init(count: count, timeout: .seconds(args.timeout ?? 30)),
+                into: [LogEntry]()
+            ) { $0.append($1) }
+
+            let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
+            let captured = collected.count
+
+            // Surface the failure on the response — otherwise the agent sees
+            // `stopped_by: "error"` with nothing to act on.
+            var streamFailure: Error?
+            let stoppedBy: String
+            switch stop {
+            case .timeout:
+                stoppedBy = "timeout"
+            case .count:
+                stoppedBy = "count"
+            case .error(let error):
+                streamFailure = error
+                stoppedBy = "error"
+            case .firstEntryTimeout, .captureComplete, .exhausted:
+                stoppedBy = "exhausted"
             }
-        } else {
-            target = .local
-        }
 
-        let config = StreamConfiguration(
-            target: target,
-            predicate: setup.predicate,
-            includeInfo: setup.includeInfo,
-            includeDebug: setup.includeDebug
-        )
-
-        let streamer = LogStreamer()
-        let stream = streamer.stream(configuration: config)
-        let timeoutSeconds = args.timeout ?? 30
-        let filterChain = setup.filterChain
-
-        let container = SendableEntryContainer()
-        let startTime = Date()
-        let timedOut = SendableBoolFlag()
-
-        // Stream collection task
-        let streamTask = Task {
-            for try await entry in stream {
-                guard filterChain.isEmpty || filterChain.matches(entry) else { continue }
-                container.append(entry)
-                if container.count >= count { break }
-            }
-        }
-
-        // Timeout task — cancels stream if it takes too long
-        let timeoutTask = Task {
-            try await Task.sleep(for: .seconds(timeoutSeconds))
-            timedOut.set()
-            streamTask.cancel()
-        }
-
-        // Wait for stream to finish (either by count or cancellation)
-        let streamResult = await streamTask.result
-        timeoutTask.cancel()
-
-        let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
-        let captured = container.count
-
-        // Pull the failure out of streamTask.result so we can surface it on the
-        // response — otherwise the agent sees `stopped_by: "error"` with zero
-        // diagnostic info and has nothing to act on.
-        var streamFailure: Error?
-        if case let .failure(error) = streamResult, !(error is CancellationError) {
-            streamFailure = error
-        }
-
-        let stoppedBy = if timedOut.get() {
-            "timeout"
-        } else if streamFailure != nil {
-            "error"
-        } else if captured >= count {
-            "count"
-        } else {
-            "exhausted"
-        }
-
-        let collected = container.entries
-        let envelope: ResultEnvelopeBuilder.Output
-        do {
-            envelope = try ResultEnvelopeBuilder(
+            let envelope = try ResultEnvelopeBuilder(
                 entries: collected,
                 full: args.full ?? false,
                 outputFile: args.output_file,
                 spillPrefix: "stream"
             ).build()
-        } catch {
-            return errorJSON(error.localizedDescription)
+
+            // try_doctor heuristic: zero captured + error means the stream never
+            // opened (system/permission level). Any captured entries imply the
+            // stream worked initially and the error is transient/mid-flight.
+            let errorMessage = streamFailure?.localizedDescription
+            let tryDoctor = (streamFailure != nil && captured == 0) ? true : nil
+
+            return StreamResult(
+                captured: captured,
+                requested: count,
+                stoppedBy: stoppedBy,
+                elapsedMs: elapsedMs,
+                truncated: envelope.truncated,
+                summary: collected.isEmpty ? nil : envelope.summary,
+                entries: envelope.inlineEntries,
+                head: envelope.head,
+                tail: envelope.tail,
+                outputFile: envelope.outputFile?.path,
+                errorMessage: errorMessage,
+                tryDoctor: tryDoctor
+            )
         }
-
-        // try_doctor heuristic: zero captured + error means the stream never
-        // opened (system/permission level). Any captured entries imply the
-        // stream worked initially and the error is transient/mid-flight.
-        let errorMessage = streamFailure?.localizedDescription
-        let tryDoctor = (streamFailure != nil && captured == 0) ? true : nil
-
-        let result = StreamResult(
-            captured: captured,
-            requested: count,
-            stoppedBy: stoppedBy,
-            elapsedMs: elapsedMs,
-            truncated: envelope.truncated,
-            summary: collected.isEmpty ? nil : envelope.summary,
-            entries: envelope.inlineEntries,
-            head: envelope.head,
-            tail: envelope.tail,
-            outputFile: envelope.outputFile?.path,
-            errorMessage: errorMessage,
-            tryDoctor: tryDoctor
-        )
-        return try json(result)
     }
 
     static let signpost = MCPTool(
@@ -826,114 +440,102 @@ enum SlogTools {
         Response: `{ count, in_flight, orphan_ends, elapsed_ms, mode, intervals, hint? }`. \
         `intervals` is grouped by name: `{ name, subsystem, category, count, in_flight, min_ms, \
         p50_ms, max_ms, total_ms }`. Set `full: true` to add per-occurrence `occurrences` \
-        (start, duration_ms, message). `hint` appears only when `count == 0`.
+        (start, duration_ms, message from the begin, end_message from the end when present). \
+        `hint` appears only when `count == 0`.
         """
     ) { (args: SignpostArgs) in
-        let live = args.live ?? false
+        await respond {
+            let live = args.live ?? false
 
-        if !live, args.last == nil, args.start == nil, args.archive_path == nil {
-            return errorJSON("Specify 'last', 'start', or 'archive_path' (or set 'live: true' for live capture)")
-        }
+            if !live, args.last == nil, args.start == nil, args.archive_path == nil {
+                throw ToolError(
+                    message: "Specify 'last', 'start', or 'archive_path' (or set 'live: true' for live capture)"
+                )
+            }
 
-        let setup: FilterSetup
-        do {
-            setup = try FilterSetup.build(
-                processes: args.process ?? [],
+            let setup = try filterSetup(
+                processes: args.process,
                 pid: args.pid,
-                subsystems: args.subsystem ?? [],
-                categories: args.category ?? [],
+                subsystems: args.subsystem,
+                categories: args.category,
                 signpost: true
             )
-        } catch let error as FilterSetupError {
-            return errorJSON(error.errorDescription ?? "\(error)")
-        } catch {
-            return errorJSON("\(error)")
-        }
 
-        let started = Date()
-        var aggregator = SignpostAggregator()
-        var stoppedBy: String?
-        var errorMessage: String?
-        var tryDoctor: Bool?
+            let started = Date()
+            var aggregator = SignpostAggregator()
+            var stoppedBy: String?
+            var errorMessage: String?
+            var tryDoctor: Bool?
 
-        if live {
-            let timeoutSeconds = min(max(args.timeout ?? 10, 1), 60)
-            let config = StreamConfiguration(
-                target: .local,
-                predicate: setup.predicate,
-                includeInfo: setup.includeInfo,
-                includeDebug: setup.includeDebug,
-                includeSignposts: true
-            )
-            let container = SendableEntryContainer()
-            let timedOut = SendableBoolFlag()
+            if live {
+                let timeoutSeconds = min(max(args.timeout ?? 10, 1), 60)
+                let config = StreamConfiguration(
+                    target: .local,
+                    predicate: setup.predicate,
+                    includeInfo: setup.includeInfo,
+                    includeDebug: setup.includeDebug,
+                    includeSignposts: true
+                )
+                let capture = await LogCapture.run(
+                    LogStreamer().stream(configuration: config),
+                    limits: .init(count: signpostLiveCap, timeout: .seconds(timeoutSeconds)),
+                    into: (aggregator: SignpostAggregator(), received: 0)
+                ) { state, entry in
+                    state.aggregator.ingest(entry)
+                    state.received += 1
+                }
+                aggregator = capture.state.aggregator
 
-            let streamTask = Task {
-                for try await entry in LogStreamer().stream(configuration: config) {
-                    container.append(entry)
-                    if container.count >= signpostLiveCap { break }
+                switch capture.stop {
+                case .timeout:
+                    stoppedBy = "timeout"
+                case .error(let error):
+                    stoppedBy = "error"
+                    errorMessage = error.localizedDescription
+                    if capture.state.received == 0 {
+                        tryDoctor = true
+                    }
+                case .count, .firstEntryTimeout, .captureComplete, .exhausted:
+                    stoppedBy = "exhausted"
+                }
+            } else {
+                let config = ShowConfiguration(
+                    timeRange: ShowConfiguration.TimeRange(last: args.last, start: args.start, end: args.end),
+                    archivePath: args.archive_path,
+                    predicate: setup.predicate,
+                    includeInfo: setup.includeInfo,
+                    includeDebug: setup.includeDebug,
+                    includeSignposts: true
+                )
+                do {
+                    for try await entry in LogReader().read(configuration: config) {
+                        aggregator.ingest(entry)
+                    }
+                } catch {
+                    throw ToolError.system(error)
                 }
             }
-            let timeoutTask = Task {
-                try await Task.sleep(for: .seconds(timeoutSeconds))
-                timedOut.set()
-                streamTask.cancel()
-            }
-            let streamResult = await streamTask.result
-            timeoutTask.cancel()
 
-            if case let .failure(error) = streamResult, !(error is CancellationError) {
-                stoppedBy = "error"
-                errorMessage = error.localizedDescription
-                if container.count == 0 { tryDoctor = true }
-            } else {
-                stoppedBy = timedOut.get() ? "timeout" : "exhausted"
-            }
-            aggregator.ingest(container.entries)
-        } else {
-            let timeRange: ShowConfiguration.TimeRange? = if let last = args.last {
-                last.lowercased() == "boot" ? .lastBoot : .last(last)
-            } else if let start = args.start {
-                args.end.map { ShowConfiguration.TimeRange.range(start: start, end: $0) } ?? .start(start)
-            } else {
-                nil
-            }
-            let config = ShowConfiguration(
-                timeRange: timeRange,
-                archivePath: args.archive_path,
-                predicate: setup.predicate,
-                includeInfo: setup.includeInfo,
-                includeDebug: setup.includeDebug,
-                includeSignposts: true
+            let summaries = aggregator.summaries()
+            let includeOccurrences = args.full ?? false
+            let intervals = summaries.map { FormattedSignpost(from: $0, includeOccurrences: includeOccurrences) }
+            let totalCount = summaries.reduce(0) { $0 + $1.count }
+            let inFlight = summaries.reduce(0) { $0 + $1.inFlightCount }
+            let hint = totalCount == 0 ? emptySignpostHint(live: live) : nil
+
+            return SignpostResult(
+                count: totalCount,
+                inFlight: inFlight,
+                orphanEnds: aggregator.orphanEndCount,
+                elapsedMs: Int(Date().timeIntervalSince(started) * 1000),
+                mode: live ? "stream" : "show",
+                intervals: intervals,
+                hint: hint,
+                stoppedBy: stoppedBy,
+                errorMessage: errorMessage,
+                tryDoctor: tryDoctor
             )
-            do {
-                for try await entry in LogReader().read(configuration: config) {
-                    aggregator.ingest(entry)
-                }
-            } catch {
-                return errorJSON(error.localizedDescription, tryDoctor: true)
-            }
         }
-
-        let summaries = aggregator.summaries()
-        let includeOccurrences = args.full ?? false
-        let intervals = summaries.map { FormattedSignpost(from: $0, includeOccurrences: includeOccurrences) }
-        let totalCount = summaries.reduce(0) { $0 + $1.count }
-        let inFlight = summaries.reduce(0) { $0 + $1.inFlightCount }
-        let hint = totalCount == 0 ? emptySignpostHint(live: live) : nil
-
-        return try json(SignpostResult(
-            count: totalCount,
-            inFlight: inFlight,
-            orphanEnds: aggregator.orphanEndCount,
-            elapsedMs: Int(Date().timeIntervalSince(started) * 1000),
-            mode: live ? "stream" : "show",
-            intervals: intervals,
-            hint: hint,
-            stoppedBy: stoppedBy,
-            errorMessage: errorMessage,
-            tryDoctor: tryDoctor
-        ))
     }
 
     /// Cap on signpost events buffered during a single live capture. Bounds
@@ -967,46 +569,49 @@ enum SlogTools {
           - `full: true` → inline every process.
         """
     ) { (args: ListProcessesArgs) in
-        let processes = try SystemQuery.listProcesses(filter: args.filter)
-        let envelope: ListEnvelopeBuilder<RunningProcess>.Output
-        do {
-            envelope = try ListEnvelopeBuilder(
+        await respond {
+            let processes: [RunningProcess]
+            do {
+                processes = try SystemQuery.listProcesses(filter: args.filter)
+            } catch {
+                throw ToolError.system(error)
+            }
+            let envelope = try ListEnvelopeBuilder(
                 items: processes,
                 full: args.full ?? false,
                 outputFile: args.output_file,
                 spillPrefix: "processes"
             ).build()
-        } catch {
-            return errorJSON(error.localizedDescription)
-        }
 
-        return try json(ProcessListResult(
-            count: processes.count,
-            truncated: envelope.truncated,
-            processes: envelope.inline,
-            head: envelope.head,
-            tail: envelope.tail,
-            outputFile: envelope.outputFile?.path
-        ))
+            return ProcessListResult(
+                count: processes.count,
+                truncated: envelope.truncated,
+                processes: envelope.inline,
+                head: envelope.head,
+                tail: envelope.tail,
+                outputFile: envelope.outputFile?.path
+            )
+        }
     }
 
     static let listSimulators = MCPTool(
         name: "slog_list_simulators",
         description: "List iOS Simulators. Use to find UDIDs for `slog_stream` with `simulator: true`. Returns array of `{name, udid, state, runtime}`."
     ) { (args: ListSimulatorsArgs) in
-        let simulators = try SystemQuery.listSimulators(
-            booted: args.booted ?? false,
-            all: args.all ?? false
-        )
-        return try json(simulators)
+        await respond {
+            do {
+                return try SystemQuery.listSimulators(booted: args.booted ?? false, all: args.all ?? false)
+            } catch {
+                throw ToolError.system(error)
+            }
+        }
     }
 
     static let doctor = MCPTool(
         name: "slog_doctor",
         description: "Check system requirements: log CLI, stream/archive access, simctl, profiles dir. Run if other tools fail unexpectedly."
     ) {
-        let checks = DoctorCheck.runAll()
-        return try json(checks)
+        await respond { DoctorCheck.runAll() }
     }
 
     // MARK: - All Tools

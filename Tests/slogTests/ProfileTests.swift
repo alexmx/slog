@@ -130,6 +130,42 @@ struct ProfileTests {
     }
 }
 
+@Suite("Profile validation Tests")
+struct ProfileValidationTests {
+    private func decode(_ json: String) throws -> Profile {
+        try JSONDecoder().decode(Profile.self, from: Data(json.utf8))
+    }
+
+    @Test
+    func validProfileHasNoProblem() throws {
+        let profile = try decode(#"{"level":"Error","format":"json","time":"relative","process":"Finder"}"#)
+        #expect(profile.unrecognizedValue == nil)
+    }
+
+    @Test
+    func unsetFieldsAreValid() {
+        #expect(Profile(process: "Finder").unrecognizedValue == nil)
+    }
+
+    @Test
+    func unknownLevelIsReported() throws {
+        let problem = try decode(#"{"level":"warn"}"#).unrecognizedValue
+        #expect(problem == "unknown level 'warn' (expected one of: debug, info, default, error, fault)")
+    }
+
+    @Test
+    func unknownFormatIsReported() throws {
+        let problem = try decode(#"{"format":"xml"}"#).unrecognizedValue
+        #expect(problem == "unknown format 'xml' (expected one of: plain, compact, color, json, toon)")
+    }
+
+    @Test
+    func unknownTimeIsReported() throws {
+        let problem = try decode(#"{"time":"utc"}"#).unrecognizedValue
+        #expect(problem == "unknown time 'utc' (expected one of: absolute, relative)")
+    }
+}
+
 @Suite("ProfileManager Tests")
 struct ProfileManagerTests {
     /// Create a temporary directory for test profiles

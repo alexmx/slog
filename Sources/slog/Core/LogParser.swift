@@ -13,40 +13,6 @@ public struct LogParser: Sendable {
 
     public init() {
         self.decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-
-            // Try ISO8601 with fractional seconds first
-            let isoFormatter = ISO8601DateFormatter()
-            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = isoFormatter.date(from: dateString) {
-                return date
-            }
-
-            // Try without fractional seconds
-            isoFormatter.formatOptions = [.withInternetDateTime]
-            if let date = isoFormatter.date(from: dateString) {
-                return date
-            }
-
-            // Try Apple's log format: "2024-01-15 10:30:45.123456-0800"
-            let appleFormatter = DateFormatter()
-            appleFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSSZ"
-            if let date = appleFormatter.date(from: dateString) {
-                return date
-            }
-
-            appleFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSSZZZZ"
-            if let date = appleFormatter.date(from: dateString) {
-                return date
-            }
-
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "Cannot decode date string: \(dateString)"
-            )
-        }
     }
 
     /// Parse a single NDJSON line into a LogEntry
@@ -92,10 +58,7 @@ public struct LogParser: Sendable {
         let timestampString = String(line[timestampRange])
         let remainder = String(line[timestampRange.upperBound...]).trimmingCharacters(in: .whitespaces)
 
-        // Parse timestamp
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSSZ"
-        guard let timestamp = dateFormatter.date(from: timestampString) else {
+        guard let timestamp = LogTimestamp.parse(timestampString) else {
             return nil
         }
 
@@ -270,25 +233,52 @@ private struct RawLogEntry: Decodable {
     }
 
     private func parseTimestamp(_ string: String) -> Date {
-        // Try ISO8601 formats
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: string) {
-            return date
-        }
+        LogTimestamp.parse(string) ?? Date()
+    }
+}
 
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        if let date = isoFormatter.date(from: string) {
-            return date
-        }
+// MARK: - Timestamp Parsing
 
-        // Try Apple's log format
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSSZ"
-        if let date = dateFormatter.date(from: string) {
-            return date
-        }
+/// Parses `log` timestamps (`2026-06-26 13:23:32.715547+0100` or ISO 8601)
+/// without losing sub-millisecond precision.
+///
+/// `DateFormatter` and `ISO8601DateFormatter` truncate fractional seconds to
+/// milliseconds, which collapses sub-ms signpost durations to 0 or 1ms. So the
+/// fraction is split off, the rest is parsed at whole-second precision, and the
+/// fraction is added back as a `Double`.
+enum LogTimestamp {
+    /// Formatters are expensive to create; `date(from:)` is thread-safe.
+    private nonisolated(unsafe) static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 
-        return Date()
+    private static let appleFormatters: [DateFormatter] = [
+        "yyyy-MM-dd HH:mm:ssZ",
+        "yyyy-MM-dd HH:mm:ssZZZZ"
+    ].map { format in
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = format
+        return formatter
+    }
+
+    static func parse(_ string: String) -> Date? {
+        let (wholeSeconds, fraction) = splitFraction(string)
+        let date = isoFormatter.date(from: wholeSeconds)
+            ?? appleFormatters.lazy.compactMap { $0.date(from: wholeSeconds) }.first
+        return date?.addingTimeInterval(fraction)
+    }
+
+    /// Splits `"…:32.715547+0100"` into `("…:32+0100", 0.715547)`.
+    private static func splitFraction(_ string: String) -> (String, TimeInterval) {
+        guard let dot = string.firstIndex(of: ".") else { return (string, 0) }
+        let digitsStart = string.index(after: dot)
+        let digitsEnd = string[digitsStart...].firstIndex { !("0"..."9").contains($0) } ?? string.endIndex
+        guard digitsStart < digitsEnd,
+              let fraction = TimeInterval("0." + string[digitsStart..<digitsEnd])
+        else { return (string, 0) }
+        return (String(string[..<dot] + string[digitsEnd...]), fraction)
     }
 }

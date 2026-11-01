@@ -126,7 +126,7 @@ struct FilterChainTests {
     @Test
     func chainCombinesWithAnd() {
         var chain = FilterChain()
-        chain.process("TestApp")
+        chain.add(ProcessNamePredicate(processName: "TestApp"))
         chain.minimumLevel(.error)
 
         #expect(chain.matches(makeEntry(processName: "TestApp", level: .error)) == true)
@@ -137,8 +137,8 @@ struct FilterChainTests {
     @Test
     func chainBuilder() {
         var chain = FilterChain()
-        chain.process("MyApp")
-        chain.subsystem("com.my.app")
+        chain.add(ProcessNamePredicate(processName: "MyApp"))
+        chain.add(SubsystemPredicate(subsystem: "com.my.app"))
         chain.minimumLevel(.info)
 
         #expect(chain.count == 3)
@@ -168,7 +168,7 @@ struct FilterChainTests {
             makeEntry(level: .fault)
         ]
 
-        let filtered = chain.filter(entries)
+        let filtered = entries.filter(chain.matches)
 
         #expect(filtered.count == 2)
         #expect(filtered[0].level == .error)

@@ -196,4 +196,29 @@ struct PredicateBuilderTests {
         let expected = "(subsystem BEGINSWITH \"com.apple.network\" OR subsystem BEGINSWITH \"com.apple.CFNetwork\") AND category == \"http\""
         #expect(predicate == expected)
     }
+
+    // MARK: - Escaping
+
+    @Test
+    func plainValuesAreUnchanged() {
+        #expect(PredicateBuilder.quoted("com.apple.network") == #""com.apple.network""#)
+    }
+
+    @Test
+    func quotesInValuesAreEscaped() {
+        let predicate = PredicateBuilder.buildPredicate(processes: [#"Fin"der"#])
+        #expect(predicate == #"processImagePath ENDSWITH "/Fin\"der""#)
+    }
+
+    @Test
+    func backslashesInValuesAreEscaped() {
+        let predicate = PredicateBuilder.buildPredicate(categories: [#"a\b"#])
+        #expect(predicate == #"category == "a\\b""#)
+    }
+
+    @Test
+    func escapingAppliesToEveryValueInAnOrGroup() {
+        let predicate = PredicateBuilder.buildPredicate(subsystems: [#"x"y"#, "plain"])
+        #expect(predicate == #"(subsystem BEGINSWITH "x\"y" OR subsystem BEGINSWITH "plain")"#)
+    }
 }
